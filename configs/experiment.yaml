@@ -1,0 +1,55 @@
+# Protocol captured as config. Code that consumes this file is later work.
+# See DEVELOPMENT_PLAN.md for the rules these fields encode.
+
+project: msbench
+seed: 20261011
+
+primary_dataset: msseg2016
+development_dataset: ms3seg   # switch to mslesseg if following MS-SAM-LESS
+transfer_dataset: isbi2015
+
+channels:
+  required: [flair]
+  optional: [t1, t2, pd, t1gd]
+
+models:
+  nnunet:
+    framework: nnunetv2
+    configurations:
+      volumetric: 3d_fullres   # MSSEG, ISBI, MSLesSeg
+      thick_slice: 2d          # MS3SEG axial FLAIR is ~5.7 mm thick
+    folds: 5
+  medsam:
+    checkpoint: medsam_vit_b
+    prompt_mode: automatic     # primary comparison; no manual boxes
+    oracle_boxes: report_only  # upper bound, not the headline number
+    reconstruction: stack_axial_slices
+
+metrics:
+  voxel_dice: true
+  lesion_f1:
+    definition: msseg2016      # Commowick et al., Sci Rep 2018
+    connectivity: 26
+  size_bins:
+    # Equivalent-sphere diameter. Fixed before any model is scored.
+    punctate_mm: 3.0
+  biomarkers: [lesion_count, lesion_volume_ml]
+  empty_both_dice: 1.0
+
+splits:
+  msseg2016:
+    # Official challenge hold-out: GE Discovery is absent from training.
+    train_scanners: [siemens_verio_3t, siemens_aera_1p5t, philips_ingenia_3t]
+    unseen_scanner: ge_discovery_3t
+  isbi2015:
+    role: transfer_only
+    raters: 2
+  ms3seg:
+    target_class: abnormal_wmh
+    folds: 5
+  mslesseg:
+    use_official_split: true
+
+reporting:
+  stratify_by: [scanner, lesion_size_bin]
+  agreement: [pearson, spearman, icc, bland_altman, mae]
