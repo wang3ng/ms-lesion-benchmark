@@ -21,9 +21,58 @@ data/
 when that dataset has them), `lesion.nii.gz` for the consensus or chosen
 rater mask, and `meta.json` with scanner, site, subject, and timepoint.
 
-Do not download data into the repository root. Record the release URL, the
-date, and any access ticket in `data/raw/<dataset_id>/SOURCE.txt` (that file
-is gitignored with the rest of `data/raw/`).
+Do not download data into the repository root. The download script writes
+`data/raw/<dataset_id>/SOURCE.txt` with the URL and the UTC time. That file
+is gitignored with the rest of `data/raw/`.
+
+## Do not commit the archives
+
+Keep the zip files and the unpacked volumes out of git. ISBI training is
+787 MB and the test archive is 2.2 GB. MSLesSeg's preprocessed zip is about
+1.37 GB. 3D-MR-MS is six parts, about 4.3 GB, under CC BY-NC-ND, which does
+not allow redistributing the files. A collaborator clones this repo and
+runs the script; they do not pull the scans from git history.
+
+```bash
+python scripts/download_datasets.py
+python scripts/download_datasets.py isbi2015 mslesseg
+python scripts/download_datasets.py 3d-mr-ms
+python scripts/download_datasets.py mslesseg --include-optional
+```
+
+URLs and expected byte counts are in `configs/downloads.yaml`. A finished
+file whose size matches the manifest is skipped, so the command is safe to
+re-run.
+
+## Official links
+
+### ISBI 2015
+
+Challenge page: https://iacl.ece.jhu.edu/index.php/MSChallenge
+
+| Archive | URL | Size on the IACL page |
+| --- | --- | --- |
+| Training | https://iacl.ece.jhu.edu/~aaron/data/training_final_v4.zip | 787 MB |
+| Test | https://iacl.ece.jhu.edu/~aaron/data/testdata_website_2016-03-24.zip | 2.2 GB |
+
+### MSLesSeg
+
+Landing page:
+https://springernature.figshare.com/articles/dataset/MSLesSeg_baseline_and_benchmarking_of_a_new_Multiple_Sclerosis_Lesion_Segmentation_dataset/27919209
+
+DOI: https://doi.org/10.6084/m9.figshare.27919209
+
+The script fetches the preprocessed `MSLesSeg Dataset.zip` (Figshare file
+52771814, 1,473,284,755 bytes). `MSLesSeg_RAW.zip` is optional.
+
+### 3D-MR-MS
+
+Resource page: https://lit.fe.uni-lj.si/en/research/resources/3D-MR-MS/
+
+Authors listed there: Žiga Lesjak, Alfiia Galimzianova, Žiga Špiclin.
+License: CC BY-NC-ND. Thirty patients in six zip files, plus a short PDF
+description. Direct file URLs are the `./data/research/resources/3D-MR-MS/`
+links on that page, recorded in the manifest.
 
 ## What to fetch first
 

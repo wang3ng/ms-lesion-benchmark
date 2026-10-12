@@ -84,10 +84,13 @@ explaining why, dated before the affected run.
 1. Create the venv in the README and confirm `nvidia-smi` sees the GPU.
 2. Request MSSEG-2016 on Shanoir the same day, because approval is the
    long pole. Do not block WP1–WP3 on that request.
-3. Download MS3SEG preprocessed NIfTI (fallback) immediately.
-4. Download MSLesSeg if disk remains after MS3SEG, or instead of it if
-   the extension track is the priority.
-5. Download ISBI 2015 training (5 subjects, both rater masks).
+3. Download public archives with `python scripts/download_datasets.py`
+   (ISBI 2015, MSLesSeg, and 3D-MR-MS). URLs are in
+   `configs/downloads.yaml`. Do not commit the zip files.
+4. Download MS3SEG preprocessed NIfTI from its Figshare record if that
+   fallback is still the first training cohort.
+5. Download ISBI 2015 training and, when disk allows, the 2.2 GB test
+   archive from the IACL links in the manifest.
 
 **Exit.** `torch.cuda.is_available()` is true on the training machine.
 At least one open dataset is unpacked under `data/raw/`. The Shanoir

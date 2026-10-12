@@ -97,8 +97,10 @@ scored.
 
 ## Data
 
-Imaging is not in git. Download instructions and the on-disk layout are
-in [`data/README.md`](data/README.md).
+Imaging is not in git. Collaborators clone the repo and run
+`python scripts/download_datasets.py`. URLs, sizes, and licenses are in
+[`configs/downloads.yaml`](configs/downloads.yaml). Layout and the
+command examples are in [`data/README.md`](data/README.md).
 
 ### Primary: MSSEG-2016
 
@@ -143,6 +145,12 @@ tool for cross-dataset transfer and for a longitudinal sanity check
 (counts and volumes should not jump arbitrarily between timepoints of the
 same subject). Cite Carass et al., NeuroImage 2017.
 
+Direct downloads from the [IACL challenge page](https://iacl.ece.jhu.edu/index.php/MSChallenge):
+[training_final_v4.zip](https://iacl.ece.jhu.edu/~aaron/data/training_final_v4.zip)
+(787 MB) and
+[testdata_website_2016-03-24.zip](https://iacl.ece.jhu.edu/~aaron/data/testdata_website_2016-03-24.zip)
+(2.2 GB).
+
 ### Fallback, used first if MSSEG access is slow
 
 These two sets are public and do not wait on Shanoir. They are for
@@ -150,13 +158,22 @@ pipeline bring-up and for a result we can compute immediately. They do
 not replace the GE hold-out.
 
 **MSLesSeg** (Guarnera et al., Scientific Data, 2025;
-[Figshare 10.6084/m9.figshare.27919209](https://doi.org/10.6084/m9.figshare.27919209)).
+[Figshare record](https://springernature.figshare.com/articles/dataset/MSLesSeg_baseline_and_benchmarking_of_a_new_Multiple_Sclerosis_Lesion_Segmentation_dataset/27919209),
+[DOI 10.6084/m9.figshare.27919209](https://doi.org/10.6084/m9.figshare.27919209)).
 The full release is 75 patients and 115 scans (T1, T2, FLAIR), registered
 to MNI152 at 182 × 218 × 182. The challenge training split is 53 patients
 (50 RRMS, 3 SPMS). That training split is the "53 clinical cases" in the
 project brief. Masks were drawn on FLAIR and checked by an MS neurologist.
 MS-SAM-LESS publishes against this split, so it is the preferred open set
-when the extension is in play.
+when the extension is in play. The download script retrieves the
+preprocessed Figshare zip (about 1.37 GB) and leaves the raw zip optional.
+
+**3D-MR-MS** is an additional public cohort from the Laboratory of Imaging
+Technologies, University of Ljubljana:
+[resource page](https://lit.fe.uni-lj.si/en/research/resources/3D-MR-MS/).
+It is thirty patients with consensus white-matter lesion masks, split into
+six zip files of roughly 680–750 MB each. The license is CC BY-NC-ND, so
+the archives stay on the machine that downloaded them.
 
 **MS3SEG** (Bawil et al., Scientific Data, 2026;
 [Figshare 10.6084/m9.figshare.30393475](https://doi.org/10.6084/m9.figshare.30393475)).

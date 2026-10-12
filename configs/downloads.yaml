@@ -1,0 +1,73 @@
+# Public archives for collaborative training.
+# The script writes these into data/raw/<id>/, which git ignores.
+# Byte counts were taken from HTTP Content-Length or the Figshare API.
+
+datasets:
+  isbi2015:
+    title: ISBI 2015 longitudinal MS lesion challenge
+    page: https://iacl.ece.jhu.edu/index.php/MSChallenge
+    license: >
+      Challenge release from the IACL page. Keep the zip files local.
+      Do not commit them or upload them to another host.
+    files:
+      - name: training_final_v4.zip
+        url: https://iacl.ece.jhu.edu/~aaron/data/training_final_v4.zip
+        bytes: 824324656
+        note: Listed as 787 MB on the challenge page. Training subjects and rater masks.
+      - name: testdata_website_2016-03-24.zip
+        url: https://iacl.ece.jhu.edu/~aaron/data/testdata_website_2016-03-24.zip
+        bytes: 2257568296
+        note: Listed as 2.2 GB on the challenge page.
+
+  mslesseg:
+    title: MSLesSeg
+    page: https://springernature.figshare.com/articles/dataset/MSLesSeg_baseline_and_benchmarking_of_a_new_Multiple_Sclerosis_Lesion_Segmentation_dataset/27919209
+    doi: https://doi.org/10.6084/m9.figshare.27919209
+    license: >
+      Public Figshare release accompanying Guarnera et al., Scientific Data
+      (2025). Cite that paper. The archives are still too large to commit.
+    files:
+      - name: MSLesSeg Dataset.zip
+        url: https://ndownloader.figshare.com/files/52771814
+        bytes: 1473284755
+        note: Preprocessed release used for training. About 1.37 GB.
+      - name: MSLesSeg_RAW.zip
+        url: https://ndownloader.figshare.com/files/53623946
+        bytes: 1295472528
+        optional: true
+        note: Raw volumes. About 1.21 GB. Skip unless a run needs them.
+      - name: MSLesSeg-2024-main.zip
+        url: https://ndownloader.figshare.com/files/53623967
+        bytes: 10966086
+        optional: true
+        note: Challenge code bundle, not the imaging cohort.
+
+  3d-mr-ms:
+    title: 3D-MR-MS (University of Ljubljana)
+    page: https://lit.fe.uni-lj.si/en/research/resources/3D-MR-MS/
+    license: >
+      CC BY-NC-ND. Download for local non-commercial use only.
+      Do not commit, rehost, or redistribute these archives.
+    files:
+      - name: 3D-MR-MS.pdf
+        url: https://lit.fe.uni-lj.si/data/research/resources/3D-MR-MS/3D-MR-MS.pdf
+        bytes: 63581
+        note: Database description from the resource page.
+      - name: 3D-MR-MS_patient01-05.zip
+        url: https://lit.fe.uni-lj.si/data/research/resources/3D-MR-MS/3D-MR-MS_patient01-05.zip
+        bytes: 773999144
+      - name: 3D-MR-MS_patient06-10.zip
+        url: https://lit.fe.uni-lj.si/data/research/resources/3D-MR-MS/3D-MR-MS_patient06-10.zip
+        bytes: 725609135
+      - name: 3D-MR-MS_patient11-15.zip
+        url: https://lit.fe.uni-lj.si/data/research/resources/3D-MR-MS/3D-MR-MS_patient11-15.zip
+        bytes: 787064473
+      - name: 3D-MR-MS_patient16-20.zip
+        url: https://lit.fe.uni-lj.si/data/research/resources/3D-MR-MS/3D-MR-MS_patient16-20.zip
+        bytes: 711674549
+      - name: 3D-MR-MS_patient21-25.zip
+        url: https://lit.fe.uni-lj.si/data/research/resources/3D-MR-MS/3D-MR-MS_patient21-25.zip
+        bytes: 789823017
+      - name: 3D-MR-MS_patient26-30.zip
+        url: https://lit.fe.uni-lj.si/data/research/resources/3D-MR-MS/3D-MR-MS_patient26-30.zip
+        bytes: 717158869
