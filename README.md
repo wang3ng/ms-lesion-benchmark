@@ -13,10 +13,10 @@ modes directly, then checks whether the masks still reproduce the manual
 quantitative readouts a lab would actually report: lesion count and lesion
 volume.
 
-No models have been trained in this commit. The tree is the protocol,
-the data map, and the order of work. The schedule and exit criteria are
-in [`DEVELOPMENT_PLAN.md`](DEVELOPMENT_PLAN.md). The machine-readable
-version of the protocol is [`configs/experiment.yaml`](configs/experiment.yaml).
+No models have been trained yet. The scientific case is
+[`proposal/proposal.md`](proposal/proposal.md). The schedule and exit
+criteria are in [`DEVELOPMENT_PLAN.md`](DEVELOPMENT_PLAN.md). The
+machine-readable protocol is [`configs/experiment.yaml`](configs/experiment.yaml).
 
 ## Questions
 
@@ -205,6 +205,7 @@ exported.
 ## Repository layout
 
 ```
+proposal/proposal.md      project proposal
 configs/experiment.yaml   protocol (splits, metrics, model names)
 data/README.md             download and on-disk layout; volumes are gitignored
 experiments/               one folder per run, configs only
