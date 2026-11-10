@@ -243,11 +243,11 @@ into this repo.
 
 ## Status
 
-This commit is the scaffold: protocol, citations, and directory contract.
-Metric code, dataset converters, and training entry points are the first
-implementation tasks in the development plan. Do not cite numbers from
-this repository until an experiment directory contains a config, a command
-log, and a table produced by the locked metric code.
+Scaffold and proposal are in place. A bring-up train on william is documented
+in [`experiments/E1-nnunet-mslesseg-small/README.md`](experiments/E1-nnunet-mslesseg-small/README.md)
+(MSLesSeg, 12 cases, nnU-Net 2D, 20 epochs, mean val Dice 0.589). That number
+is not a project claim. Metric code and full open-data baselines are still
+ahead.
 
 ## References
 

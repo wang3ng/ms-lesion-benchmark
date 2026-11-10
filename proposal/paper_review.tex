@@ -1,0 +1,42 @@
+\documentclass[10pt]{article}
+\usepackage[margin=0.65in]{geometry}
+\usepackage{times}
+\usepackage[hidelinks]{hyperref}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.28em}
+\pagestyle{empty}
+
+\begin{document}
+
+\begin{center}
+{\large\textbf{Project Paper Review}}\\[0.15em]
+William Wang \quad$\cdot$\quad Computer Vision Project (MS Lesion Benchmark)
+\end{center}
+
+\noindent\textbf{Reference.}
+Jun Ma, Yuting He, Feifei Li, Lin Han, Chenyu You, and Bo Wang.
+``Segment anything in medical images.''
+\textit{Nature Communications} 15, 654 (2024).
+DOI: \url{https://doi.org/10.1038/s41467-024-44824-z}
+(arXiv:2304.12306).
+
+\section*{Goal of the Paper}
+The authors want one segmentation model that works across many medical tasks, not a specialist network per organ or modality. Manual outlines take time. Task-specific deep models often fail when the scanner, contrast, or target changes. Out-of-the-box Segment Anything (SAM) was trained on natural images and misses weak medical boundaries. MedSAM fine-tunes SAM on a large medical image--mask corpus so one promptable model can cover many anatomies and lesions. The point is to avoid training a new U-Net for every clinical task.
+
+\section*{Data}
+They assembled about 1{,}570{,}263 image--mask pairs across 10 modalities (CT, MRI, endoscopy, ultrasound, pathology, fundus, dermoscopy, mammography, OCT, and related protocols) and more than 30 cancer types. The pairs come from public medical segmentation sources, not one private hospital. Train / tune / validation are 80\% / 10\% / 10\%, split at the 3D-scan or video level so slices from the same exam do not leak. External validation covers 60 held-out tasks that never appear in training. Inputs are 2D; volumes are sliced. Code and weights are public. This is not an MS-lesion-only dataset.
+
+\section*{Algorithm}
+MedSAM is a fine-tuned SAM: ViT-B image encoder (12 transformer blocks), prompt encoder, and a light mask decoder. Images are resized to $1024\times1024\times 3$ and normalized ($16\times16$ patches). Training boxes come from the ground-truth mask with small random jitter. The prompt encoder stays frozen. The image encoder and mask decoder train with AdamW under Dice loss plus binary cross-entropy. The output is a soft mask for the prompted region. At inference the model still needs a box, so it is not fully automatic. They also train modality-wise U-Net and DeepLabV3+ specialists as baselines.
+
+\section*{Statistical Results}
+They score with Dice similarity coefficient (DSC) and normalized surface distance (NSD, tolerance 2), following Metrics Reloaded. They report median DSC and IQR over 86 internal and 60 external tasks, podium plots of rank frequency, and Wilcoxon signed-rank tests between methods. On internal tasks, plain SAM is usually last. MedSAM ranks first on most tasks and beats the specialist U-Net and DeepLabV3+ overall, with a tighter DSC spread. On external tasks, specialists sometimes lose to SAM on unseen targets; MedSAM stays ahead (for example, large DSC gains on nasopharynx cancer). Qualitative figures show cleaner weak-boundary masks than SAM. The authors claim higher accuracy and better hold-out behavior than the compared baselines.
+
+\section*{Interpretation and Relation to My Project}
+I buy the core claim. Medical fine-tuning with box prompts improves SAM on this suite, and open code makes that checkable.
+
+I do not read the headline as proof that foundation models beat specialists on MS lesions. MedSAM is scored with boxes that already know where the target is, so the setup is semi-automatic. DSC and NSD measure overlap. They do not measure lesion-wise detection of tiny scattered plaques, or agreement of lesion count and volume. MRI is only one modality here, and MS white-matter lesions are not the focus.
+
+My project puts MedSAM against nnU-Net on MSSEG-2016 and open MS sets. We use automatic prompts, lesion-wise F1 (including a punctate bin), the GE scanner hold-out, and count/volume metrics. Those are the MS questions this paper does not answer.
+
+\end{document}
