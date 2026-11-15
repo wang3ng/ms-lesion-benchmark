@@ -324,7 +324,8 @@ def main(argv=None) -> int:
     tot = int(small.sum())
     parts = ", ".join(f"{SCANNER_LABELS.get(s, s)} {int(n)} ({100 * n / tot:.0f}%)" for s, n in small.items())
     add(f"**Who contributes the smallest bin ({names[0]} mm³).** {tot} training lesions: {parts}. "
-        "Voxel size differs about 3.5× between scanners (see table above), so a 20 mm³ lesion is "
+        f"Voxel volume differs {vox.max() / vox.min():.1f}× between scanners "
+        f"({vox.min():.2f}–{vox.max():.2f} mm³, see table above), so a 20 mm³ lesion is "
         f"≈{20 / vox.get('siemens_aera_1p5t', np.nan):.0f} voxels on the Aera 1.5T but "
         f"≈{20 / vox.get('philips_ingenia_3t', np.nan):.0f} on the Philips. Small-lesion results are therefore "
         "largely Philips results; per-scanner size-bin numbers for the Aera are thin.\n")
