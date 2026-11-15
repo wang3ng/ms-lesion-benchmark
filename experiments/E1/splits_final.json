@@ -1,0 +1,107 @@
+[
+  {
+    "train": [
+      "msseg_train_c01_p01",
+      "msseg_train_c01_p02",
+      "msseg_train_c01_p03",
+      "msseg_train_c01_p04",
+      "msseg_train_c07_p01",
+      "msseg_train_c07_p02",
+      "msseg_train_c07_p04",
+      "msseg_train_c07_p05",
+      "msseg_train_c08_p02",
+      "msseg_train_c08_p03",
+      "msseg_train_c08_p04",
+      "msseg_train_c08_p05"
+    ],
+    "val": [
+      "msseg_train_c01_p05",
+      "msseg_train_c07_p03",
+      "msseg_train_c08_p01"
+    ]
+  },
+  {
+    "train": [
+      "msseg_train_c01_p01",
+      "msseg_train_c01_p02",
+      "msseg_train_c01_p03",
+      "msseg_train_c01_p05",
+      "msseg_train_c07_p01",
+      "msseg_train_c07_p02",
+      "msseg_train_c07_p03",
+      "msseg_train_c07_p04",
+      "msseg_train_c08_p01",
+      "msseg_train_c08_p02",
+      "msseg_train_c08_p03",
+      "msseg_train_c08_p04"
+    ],
+    "val": [
+      "msseg_train_c01_p04",
+      "msseg_train_c07_p05",
+      "msseg_train_c08_p05"
+    ]
+  },
+  {
+    "train": [
+      "msseg_train_c01_p02",
+      "msseg_train_c01_p03",
+      "msseg_train_c01_p04",
+      "msseg_train_c01_p05",
+      "msseg_train_c07_p01",
+      "msseg_train_c07_p03",
+      "msseg_train_c07_p04",
+      "msseg_train_c07_p05",
+      "msseg_train_c08_p01",
+      "msseg_train_c08_p02",
+      "msseg_train_c08_p04",
+      "msseg_train_c08_p05"
+    ],
+    "val": [
+      "msseg_train_c01_p01",
+      "msseg_train_c07_p02",
+      "msseg_train_c08_p03"
+    ]
+  },
+  {
+    "train": [
+      "msseg_train_c01_p01",
+      "msseg_train_c01_p02",
+      "msseg_train_c01_p04",
+      "msseg_train_c01_p05",
+      "msseg_train_c07_p02",
+      "msseg_train_c07_p03",
+      "msseg_train_c07_p04",
+      "msseg_train_c07_p05",
+      "msseg_train_c08_p01",
+      "msseg_train_c08_p02",
+      "msseg_train_c08_p03",
+      "msseg_train_c08_p05"
+    ],
+    "val": [
+      "msseg_train_c01_p03",
+      "msseg_train_c07_p01",
+      "msseg_train_c08_p04"
+    ]
+  },
+  {
+    "train": [
+      "msseg_train_c01_p01",
+      "msseg_train_c01_p03",
+      "msseg_train_c01_p04",
+      "msseg_train_c01_p05",
+      "msseg_train_c07_p01",
+      "msseg_train_c07_p02",
+      "msseg_train_c07_p03",
+      "msseg_train_c07_p05",
+      "msseg_train_c08_p01",
+      "msseg_train_c08_p03",
+      "msseg_train_c08_p04",
+      "msseg_train_c08_p05"
+    ],
+    "val": [
+      "msseg_train_c01_p02",
+      "msseg_train_c07_p04",
+      "msseg_train_c08_p02"
+    ]
+  }
+]
