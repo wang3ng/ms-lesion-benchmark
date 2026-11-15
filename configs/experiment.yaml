@@ -1,82 +1,55 @@
-# Protocol captured as config. Scripts read this file instead of hard-coding
-# values. Design follows the submitted full proposal; see CLAUDE.md.
+# Protocol captured as config. Code that consumes this file is later work.
+# See DEVELOPMENT_PLAN.md for the rules these fields encode.
 
 project: msbench
 seed: 20261011
 
 primary_dataset: msseg2016
-development_dataset: mslesseg   # for debugging pipelines only; not in final tables
+development_dataset: ms3seg   # switch to mslesseg if following MS-SAM-LESS
 transfer_dataset: isbi2015
 
-# Shared by MSSEG, ISBI and MSLesSeg, so one model can be tested on all.
-channels: [flair, t1, t2]
+channels:
+  required: [flair]
+  optional: [t1, t2, pd, t1gd]
 
 models:
   nnunet:
     framework: nnunetv2
-    configuration: 3d_fullres   # final numbers on the lab RTX 4090
+    configurations:
+      volumetric: 3d_fullres   # MSSEG, ISBI, MSLesSeg
+      thick_slice: 2d          # MS3SEG axial FLAIR is ~5.7 mm thick
     folds: 5
-    epochs: 1000                # if reduced, reduce for ALL folds and record it
   medsam:
     checkpoint: medsam_vit_b
-    input: axial_slices         # channels = flair, t1, t2
-    freeze_image_encoder: true  # train prompt encoder + mask decoder only
-    cache_embeddings: true
+    prompt_mode: automatic     # primary comparison; no manual boxes
+    oracle_boxes: report_only  # upper bound, not the headline number
     reconstruction: stack_axial_slices
 
-# Each MedSAM condition is fine-tuned separately, with the same box type
-# at training and test time.
-experiments:
-  E1:  {model: nnunet}
-  E2a: {model: medsam, boxes: oracle}         # upper bound on tracing only
-  E2b: {model: medsam, boxes: nnunet}         # needs E1 predictions
-  E2c: {model: medsam, boxes: independent}    # the fair head-to-head with E1
-  E6:  {analysis: biomarkers, models: [E1, best_medsam]}
-  E8:  {fix: choose_after_E2a_vs_E2c}         # zoomed_tiles OR small_lesion_loss
-
-boxes:
-  independent:
-    whole_brain: true           # one box around the brain mask per slice
-    tiles:
-      grid: [4, 4]              # within the brain bounding box
-      overlap: 0.25
-      include_empty_tiles: true # so MedSAM learns to output an empty mask
-  oracle:
-    jitter_px: [0, 5]
-
 metrics:
-  voxel_dice: {empty_both: 1.0}
-  lesion_detection:
-    rule: msseg2016             # Commowick et al., Sci Rep 2018
-    connectivity: 26            # VERIFY against animaSegPerfAnalyzer
-    min_lesion_mm3: 3.0         # VERIFY against animaSegPerfAnalyzer
-    alpha: 0.10                 # min overlap fraction
-    gamma: 0.65                 # max fraction of a predicted lesion outside the reference
-  size_bins_mm3: null           # set from MSSEG TRAINING-set lesion counts
-                                # (msbench.metrics.lesion_volume_histogram), e.g. [20, 100]
-  report: [dice, lesion_precision, lesion_recall, lesion_f1, size_bin_f1,
-           fp_lesions_per_scan, lesion_count, lesion_volume_ml]
-
-statistics:
-  cross_validation: {folds: 5, unit: patient}
-  paired_test: wilcoxon_signed_rank
-  confidence_interval: {method: bootstrap_percentile, level: 0.95, n_boot: 10000}
-  agreement: [mae, bland_altman]  # ICC descriptive only
+  voxel_dice: true
+  lesion_f1:
+    definition: msseg2016      # Commowick et al., Sci Rep 2018
+    connectivity: 26
+  size_bins:
+    # Equivalent-sphere diameter. Fixed before any model is scored.
+    punctate_mm: 3.0
+  biomarkers: [lesion_count, lesion_volume_ml]
+  empty_both_dice: 1.0
 
 splits:
   msseg2016:
-    # Official challenge split: GE Discovery is absent from training.
+    # Official challenge hold-out: GE Discovery is absent from training.
     train_scanners: [siemens_verio_3t, siemens_aera_1p5t, philips_ingenia_3t]
     unseen_scanner: ge_discovery_3t
-    reference: consensus          # the 7 expert masks give the human reference
   isbi2015:
-    role: external_test
-    use: labeled_training_subjects  # 21 scans; online leaderboard unavailable
-    raters: [rater1, rater2]        # score each separately
+    role: transfer_only
+    raters: 2
+  ms3seg:
+    target_class: abnormal_wmh
+    folds: 5
   mslesseg:
     use_official_split: true
 
 reporting:
-  test_settings: [msseg_in_distribution, msseg_ge_unseen, isbi2015]
   stratify_by: [scanner, lesion_size_bin]
-  per_case_table: [msseg_ge_unseen]
+  agreement: [pearson, spearman, icc, bland_altman, mae]
