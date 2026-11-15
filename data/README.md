@@ -16,10 +16,36 @@ data/
   nnUNet_results/
 ```
 
-`processed/<dataset_id>/<case_id>/` should contain one NIfTI per channel
-(`flair.nii.gz`, and `t1.nii.gz`, `t2.nii.gz`, `pd.nii.gz`, `t1gd.nii.gz`
-when that dataset has them), `lesion.nii.gz` for the consensus or chosen
-rater mask, and `meta.json` with scanner, site, subject, and timepoint.
+**Where the data actually live.** Paths are set in `configs/experiment.yaml`
+(`paths:`), relative to the repo root. On the lab machine raw data are in
+`CV_MS_proj/data/raw/`, the common layout in `CV_MS_proj/data/processed/`,
+and our nnU-Net folders in `CV_MS_proj/nnunet/` (exported by
+`source scripts/env.sh`, which overrides the lab mate's `nnUNet_*` in
+`~/.bashrc`).
+
+### Common case layout (`python -m msbench.data.convert`)
+
+```
+processed/
+  index.csv            one row per case (scanner, split, shape, spacing, primary-reference stats)
+  lesion_stats.csv     one row per (case, reference mask): voxels, lesion count, volume mL
+  <dataset>/<case_id>/
+    flair.nii.gz t1.nii.gz t2.nii.gz   FLAIR/T1/T2 only (CLAUDE.md); release's preprocessed images
+    lesion.nii.gz                      primary reference: MSSEG consensus, MSLesSeg mask
+    lesion_rater<k>.nii.gz             MSSEG experts 1-7, ISBI raters 1-2
+    brain_mask.nii.gz                  MSSEG only
+    meta.json                          scanner, site, subject, timepoint, sources, header fixes, stats
+```
+
+- ISBI has no consensus, so it has no `lesion.nii.gz`; score each rater.
+- `release_split` is the release's own split. MSSEG `test` holds the GE
+  (`ge_discovery_3t`, center 03) unseen-scanner cases. ISBI cases come from
+  the release's `train` folder but are our external test set.
+- `subject_id` is the cross-validation unit (ISBI/MSLesSeg timepoints share it).
+- All images and masks are on the FLAIR grid. Cases whose grids differ fail;
+  affine differences < 0.01 mm (one MSSEG test case) are fixed by writing the
+  FLAIR header, and listed under `header_fixes` in `meta.json`.
+- Masks are uint8 {0,1} and carry the FLAIR qform **and** sform verbatim.
 
 Do not download data into the repository root. The download script writes
 `data/raw/<dataset_id>/SOURCE.txt` with the URL and the UTC time. That file
