@@ -38,6 +38,24 @@ def nnunet_dataset_name(cfg: dict | None = None) -> str:
     return f"Dataset{int(nn['dataset_id']):03d}_{nn['dataset_name']}"
 
 
+def nnunet_trainer(cfg: dict | None = None) -> str:
+    """Trainer class for the configured epoch budget (same for every fold)."""
+    cfg = cfg or load_config()
+    epochs = int(cfg["models"]["nnunet"]["epochs"])
+    return "nnUNetTrainer" if epochs == 1000 else f"nnUNetTrainer_{epochs}epochs"
+
+
+def nnunet_fold_dir(fold: int, cfg: dict | None = None, results_root: str | Path | None = None,
+                    trainer: str | None = None) -> Path:
+    """<nnUNet_results>/<dataset>/<trainer>__nnUNetPlans__<config>/fold_<k>."""
+    import os
+
+    cfg = cfg or load_config()
+    root = Path(results_root or os.environ.get("nnUNet_results") or paths(cfg)["nnunet_root"] / "nnUNet_results")
+    conf = cfg["models"]["nnunet"]["configuration"]
+    return root / nnunet_dataset_name(cfg) / f"{trainer or nnunet_trainer(cfg)}__nnUNetPlans__{conf}" / f"fold_{fold}"
+
+
 def shell_exports(cfg: dict | None = None) -> dict[str, str]:
     cfg = cfg or load_config()
     p = paths(cfg)
@@ -51,6 +69,7 @@ def shell_exports(cfg: dict | None = None) -> dict[str, str]:
         "MSBENCH_NNUNET_ID": str(int(cfg["models"]["nnunet"]["dataset_id"])),
         "MSBENCH_NNUNET_DATASET": nnunet_dataset_name(cfg),
         "MSBENCH_NNUNET_CONFIG": cfg["models"]["nnunet"]["configuration"],
+        "MSBENCH_NNUNET_TRAINER": nnunet_trainer(cfg),
         "nnUNet_raw": str(nn_root / "nnUNet_raw"),
         "nnUNet_preprocessed": str(nn_root / "nnUNet_preprocessed"),
         "nnUNet_results": str(nn_root / "nnUNet_results"),

@@ -14,7 +14,8 @@ Status: **preprocessed, not launched** (2026-11-15).
 | Plans | default `nnUNetPlans`, `3d_fullres`: PlainConvUNet, 6 stages, patch 96×160×160, batch 2, spacing 1.1×0.744×0.744 mm ([nnUNetPlans.json](nnUNetPlans.json)) |
 | Folds | patient-level, stratified by scanner (one patient per scanner per fold), seed 20261011 ([splits_final.json](splits_final.json)) |
 | Trainer | `nnUNetTrainer` (1000 epochs) unless reduced uniformly, see below |
-| Launcher | `scripts/run_E1.sh` → `scripts/nnunet_fold.sh`; logs `logs/E1/fold<k>.log` |
+| Launcher | `scripts/run_E1.sh --folds "0 1"`: one background job, folds in order, `scripts/evaluate.py` after each; logs `logs/E1/job.log`, `logs/E1/fold<k>.log` |
+| Evaluation | `results/E1/fold<k>_cases.csv` (per case: Dice, lesion P/R/F1, FP lesions, size-bin recall/F1, count and volume); summary: `scripts/midpoint_summary.py` → `results/midpoint/` |
 
 Reproduce from raw data:
 
@@ -24,7 +25,8 @@ python -m msbench.data.convert msseg2016
 python -m msbench.nnunet_export
 nnUNetv2_plan_and_preprocess -d 501 -c 3d_fullres -np 8 --verify_dataset_integrity   # 43 s
 python -m msbench.nnunet_export --splits
-scripts/run_E1.sh
+scripts/run_E1.sh --folds "0 1"     # then later: scripts/run_E1.sh --folds "2 3 4"
+python scripts/midpoint_summary.py
 ```
 
 ## Epoch budget
@@ -38,7 +40,7 @@ first epoch 68 s (includes compilation), then **32.4 s/epoch** (250 train + 50 v
 | 500 | ≈ 4.5 h | ≈ 23 h |
 | 250 | ≈ 2.3 h | ≈ 11 h |
 
-_Chosen: to be filled when launched._
+**Chosen: 1000 epochs (nnU-Net default), unchanged for all folds** (decided 2026-11-15 before any fold started).
 
 ## Results
 

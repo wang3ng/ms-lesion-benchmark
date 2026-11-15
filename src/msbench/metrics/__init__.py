@@ -57,7 +57,10 @@ def evaluate_case(
     for name, res in lesion_detection_by_size(pred, ref, bin_edges_mm3, spacing, **rule).items():
         row[f"f1_{name}"] = res.f1
         row[f"recall_{name}"] = res.recall
+        row[f"precision_{name}"] = res.precision
         row[f"n_ref_{name}"] = res.n_ref
+        row[f"detected_{name}"] = res.tp_ref   # for pooled (lesion-level) recall per bin
+        row[f"n_pred_{name}"] = res.n_pred
     return row
 
 

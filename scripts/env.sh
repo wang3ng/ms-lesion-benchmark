@@ -18,10 +18,23 @@ source "$_msbench_repo/.venv/bin/activate"
 # Paths, dataset ID and seed come from configs/experiment.yaml.
 eval "$(python -m msbench.config --shell)" || { echo "env.sh: could not read config" >&2; return 1 2>/dev/null || exit 1; }
 
+export MSBENCH_RESULTS="$_msbench_repo/results"
+
+# Test sandbox (scripts only, never for real runs): MSBENCH_SANDBOX=<dir> sends
+# nnU-Net results, results/ and logs/ into <dir>, and puts <dir>/bin first on
+# PATH so a fake nnUNetv2_train can stand in for the GPU.
+if [ -n "${MSBENCH_SANDBOX:-}" ]; then
+    export nnUNet_results="$MSBENCH_SANDBOX/nnUNet_results"
+    export MSBENCH_RESULTS="$MSBENCH_SANDBOX/results"
+    export MSBENCH_LOGS="$MSBENCH_SANDBOX/logs"
+    export PATH="$MSBENCH_SANDBOX/bin:$PATH"
+fi
+
 # Guard: never let nnU-Net write into another user's folders.
 for _v in nnUNet_raw nnUNet_preprocessed nnUNet_results; do
     case "${!_v}" in
         "$(dirname "$_msbench_repo")"/*) ;;
+        "${MSBENCH_SANDBOX:-/nonexistent}"/*) ;;
         *) echo "env.sh: $_v=${!_v} is outside the project; refusing" >&2; return 1 2>/dev/null || exit 1 ;;
     esac
     mkdir -p "${!_v}"
