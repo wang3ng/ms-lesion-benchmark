@@ -35,6 +35,8 @@ data/nnUNet_results/
 *.nrrd
 
 # Training artifacts
+logs/
+nnunet/
 checkpoints/
 wandb/
 *.pt
