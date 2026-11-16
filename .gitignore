@@ -48,6 +48,9 @@ wandb/
 results/**
 !results/.gitkeep
 !results/README.md
+# Midpoint report (summary stats and training curves only; no images or masks).
+!results/midpoint/
+!results/midpoint/**
 
 # Notebook scratch
 .ipynb_checkpoints/

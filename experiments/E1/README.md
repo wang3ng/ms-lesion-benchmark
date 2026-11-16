@@ -1,6 +1,6 @@
 # E1 — nnU-Net v2 3d_fullres on MSSEG-2016 (5 folds)
 
-Status: **preprocessed, not launched** (2026-11-15).
+Status: **folds 0–1 finished and evaluated (2026-11-16 07:20); folds 2–4 training** (one job, started 2026-11-16 08:28, expected to end ≈ 2026-11-17 12:00).
 
 ## Setup
 
@@ -27,6 +27,7 @@ nnUNetv2_plan_and_preprocess -d 501 -c 3d_fullres -np 8 --verify_dataset_integri
 python -m msbench.nnunet_export --splits
 scripts/run_E1.sh --folds "0 1"     # then later: scripts/run_E1.sh --folds "2 3 4"
 python scripts/midpoint_summary.py
+python scripts/e1_summary.py       # pools all evaluated folds -> results/E1/summary/
 ```
 
 ## Epoch budget
@@ -44,4 +45,14 @@ first epoch 68 s (includes compilation), then **32.4 s/epoch** (250 train + 50 v
 
 ## Results
 
-_To be filled after training: wall time per fold, validation Dice / lesion F1 per fold._
+Job 1 (folds 0, 1), commit `f2fccd5`, 1000 epochs, RTX 4090 with no other compute job running.
+Validation = the 3 held-out patients of each fold (one per scanner), MSSEG consensus reference.
+
+| fold | wall time | s / epoch | nnU-Net val Dice | our Dice (mean of 3) | lesion F1 (mean of 3) | FP lesions / scan |
+|---|---|---|---|---|---|---|
+| 0 | 9 h 12 min | 32.4 | 0.753 | 0.753 | 0.682 | 5.0 |
+| 1 | 9 h 11 min | 32.3 | 0.762 | 0.762 | 0.810 | 6.3 |
+
+Midpoint report (folds 0–1, 6 patients): [`results/midpoint/summary.md`](../../results/midpoint/summary.md).
+Pooled cross-validation over all 15 patients (mean ± SD, bootstrap 95% CI, recall by size bin):
+`python scripts/e1_summary.py` -> `results/E1/summary/summary.md`, to be filled in here after fold 4.
