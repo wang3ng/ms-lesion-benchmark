@@ -58,6 +58,31 @@ def bootstrap_ci(
     return {"n": int(len(x)), "estimate": float(stat(x)), "low": float(lo), "high": float(hi)}
 
 
+def bootstrap_ratio_ci(
+    numerator: Sequence[float],
+    denominator: Sequence[float],
+    n_boot: int = 10_000,
+    level: float = 0.95,
+    seed: int = 20261011,
+) -> dict:
+    """Cluster bootstrap CI for sum(numerator) / sum(denominator), resampling cases.
+
+    For pooled lesion-level rates (e.g. detected / reference lesions in a size bin)
+    the patient is the independent unit, so whole patients are resampled together
+    with all their lesions. Resamples whose denominator is 0 are dropped.
+    """
+    num, den = _clean_pairs(numerator, denominator)
+    if len(num) == 0 or den.sum() == 0:
+        return {"n": int(len(num)), "estimate": float("nan"), "low": float("nan"), "high": float("nan")}
+    rng = np.random.default_rng(seed)
+    idx = rng.integers(0, len(num), size=(n_boot, len(num)))
+    d = den[idx].sum(axis=1)
+    ok = d > 0
+    boots = num[idx].sum(axis=1)[ok] / d[ok]
+    lo, hi = np.quantile(boots, [(1 - level) / 2, 1 - (1 - level) / 2])
+    return {"n": int(len(num)), "estimate": float(num.sum() / den.sum()), "low": float(lo), "high": float(hi)}
+
+
 def paired_bootstrap_diff_ci(
     a: Sequence[float],
     b: Sequence[float],

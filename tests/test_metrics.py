@@ -13,7 +13,13 @@ from msbench.metrics import (
     lesion_volume_histogram,
     lesion_volume_ml,
 )
-from msbench.stats import bland_altman, bootstrap_ci, paired_bootstrap_diff_ci, paired_wilcoxon
+from msbench.stats import (
+    bland_altman,
+    bootstrap_ci,
+    bootstrap_ratio_ci,
+    paired_bootstrap_diff_ci,
+    paired_wilcoxon,
+)
 
 SHAPE = (40, 40, 40)
 
@@ -134,6 +140,17 @@ def test_wilcoxon_and_bootstrap():
     assert ci["low"] == pytest.approx(0.1) and ci["high"] == pytest.approx(0.1)
     one = bootstrap_ci(a, n_boot=500)
     assert one["low"] <= one["estimate"] <= one["high"]
+
+
+def test_bootstrap_ratio_ci_pools_whole_patients():
+    detected = [5, 0, 9, 2]
+    reference = [10, 0, 10, 4]   # second patient has no lesion in this bin
+    ci = bootstrap_ratio_ci(detected, reference, n_boot=2000)
+    assert ci["estimate"] == pytest.approx(16 / 24) and ci["n"] == 4
+    assert 0.5 <= ci["low"] <= ci["estimate"] <= ci["high"] <= 0.9
+    same = bootstrap_ratio_ci([3, 6, 9], [3, 6, 9], n_boot=500)
+    assert same["low"] == same["high"] == 1.0
+    assert math.isnan(bootstrap_ratio_ci([0, 0], [0, 0])["estimate"])
 
 
 def test_stats_drop_nan_pairs():

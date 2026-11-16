@@ -30,63 +30,11 @@ import pandas as pd  # noqa: E402
 
 from msbench.config import REPO_ROOT, load_config, nnunet_fold_dir, nnunet_trainer, paths  # noqa: E402
 from msbench.metrics import bin_names, dice  # noqa: E402
+from msbench.reporting import (  # noqa: E402
+    INK, INK2, MAIN_METRICS, SCANNER_LABELS, SURFACE, fig_agreement_scatter, job_alive, mask_empty_bins,
+    md_table, mean_sd, new_fig,
+)
 from msbench.summaries import bin_counts, nnunet_training_progress, training_lesion_volumes  # noqa: E402
-
-# Chart style: reference palette (dataviz skill, references/palette.md), light mode.
-SURFACE, INK, INK2, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e4e3df"
-SCANNER_COLORS = {  # fixed per scanner (identity), never by rank
-    "siemens_verio_3t": "#2a78d6",
-    "siemens_aera_1p5t": "#eb6834",
-    "philips_ingenia_3t": "#1baf7a",
-    "ge_discovery_3t": "#eda100",
-}
-SCANNER_LABELS = {
-    "siemens_verio_3t": "Siemens Verio 3T",
-    "siemens_aera_1p5t": "Siemens Aera 1.5T",
-    "philips_ingenia_3t": "Philips Ingenia 3T",
-    "ge_discovery_3t": "GE Discovery 3T",
-}
-MAIN_METRICS = ["dice", "lesion_precision", "lesion_recall", "lesion_f1", "fp_lesions"]
-
-
-# ---------------------------------------------------------------- formatting
-def md_table(df: pd.DataFrame, index: bool = True, floatfmt: str = "{:.3f}") -> str:
-    d = df.reset_index() if index else df
-    def fmt(v):
-        if isinstance(v, (float, np.floating)):
-            return "–" if np.isnan(v) else floatfmt.format(v)
-        return str(v)
-    head = "| " + " | ".join(map(str, d.columns)) + " |"
-    sep = "|" + "|".join("---" for _ in d.columns) + "|"
-    rows = ["| " + " | ".join(fmt(v) for v in r) + " |" for r in d.itertuples(index=False)]
-    return "\n".join([head, sep, *rows])
-
-
-def mean_sd(s: pd.Series) -> str:
-    s = pd.to_numeric(s, errors="coerce").dropna()
-    if s.empty:
-        return "–"
-    if len(s) == 1:
-        return f"{s.iloc[0]:.3f} (n=1)"
-    return f"{s.mean():.3f} ± {s.std(ddof=1):.3f} (n={len(s)})"
-
-
-def style_axes(ax):
-    ax.set_facecolor(SURFACE)
-    for side in ("top", "right"):
-        ax.spines[side].set_visible(False)
-    for side in ("left", "bottom"):
-        ax.spines[side].set_color(INK2)
-    ax.tick_params(colors=INK2, labelsize=9)
-    ax.grid(True, color=GRID, linewidth=0.8)
-    ax.set_axisbelow(True)
-
-
-def new_fig(w, h, ncols=1):
-    fig, axes = plt.subplots(1, ncols, figsize=(w, h), facecolor=SURFACE)
-    for ax in np.atleast_1d(axes):
-        style_axes(ax)
-    return fig, axes
 
 
 # ---------------------------------------------------------------- data facts
@@ -106,17 +54,6 @@ def isbi_rater_agreement(processed: Path, index: pd.DataFrame, stats: pd.DataFra
             "inter_rater_dice": dice(m1, m2),
         })
     return pd.DataFrame(rows)
-
-
-def job_alive(logdir: Path) -> bool:
-    pidf = logdir / "job.pid"
-    if not pidf.exists():
-        return False
-    pid = pidf.read_text().strip()
-    try:
-        return "run_E1" in Path(f"/proc/{pid}/cmdline").read_bytes().decode(errors="replace")
-    except OSError:
-        return False
 
 
 # ---------------------------------------------------------------- figures
@@ -150,28 +87,6 @@ def fig_recall_by_bin(cases: pd.DataFrame, names: list[str], out: Path) -> pd.Da
     fig.savefig(out, dpi=150, facecolor=SURFACE)
     plt.close(fig)
     return pooled
-
-
-def fig_agreement_scatter(cases: pd.DataFrame, out: Path) -> None:
-    fig, axes = new_fig(10, 4.4, ncols=2)
-    panels = [("n_ref_lesions", "n_pred_lesions", "Lesion count", ""),
-              ("ref_volume_ml", "pred_volume_ml", "Lesion volume", " (mL)")]
-    for ax, (xc, yc, title, unit) in zip(axes, panels):
-        hi = max(cases[xc].max(), cases[yc].max(), 1) * 1.08
-        ax.plot([0, hi], [0, hi], color=INK2, linestyle="--", linewidth=1, label="identity", zorder=1)
-        for sc in [s for s in SCANNER_COLORS if s in set(cases.scanner)]:
-            c = cases[cases.scanner == sc]
-            ax.scatter(c[xc], c[yc], s=64, color=SCANNER_COLORS[sc], edgecolor=SURFACE, linewidth=2,
-                       label=SCANNER_LABELS.get(sc, sc), zorder=2)
-        ax.set_xlim(0, hi), ax.set_ylim(0, hi)
-        ax.set_aspect("equal")
-        ax.set_xlabel(f"Reference (consensus){unit}", color=INK2, fontsize=9)
-        ax.set_ylabel(f"Predicted (nnU-Net){unit}", color=INK2, fontsize=9)
-        ax.set_title(f"{title}: predicted vs reference", color=INK, fontsize=11, loc="left")
-    axes[0].legend(frameon=False, fontsize=8, labelcolor=INK2, loc="upper left")
-    fig.tight_layout()
-    fig.savefig(out, dpi=150, facecolor=SURFACE)
-    plt.close(fig)
 
 
 # ---------------------------------------------------------------- main
@@ -269,13 +184,14 @@ def main(argv=None) -> int:
         add("_No fold has been evaluated yet (`results/{}/fold<k>_cases.csv` missing)._\n".format(args.exp))
         cases = None
     else:
-        cases = pd.concat(eval_cases, ignore_index=True)
+        cases = mask_empty_bins(pd.concat(eval_cases, ignore_index=True), names)
         metric_cols = MAIN_METRICS + [f"recall_{b}" for b in names] + [f"f1_{b}" for b in names]
         tbl = {f"fold {f}": [mean_sd(cases[cases.fold == f][m]) for m in metric_cols]
                for f in sorted(cases.fold.unique())}
         tbl["pooled"] = [mean_sd(cases[m]) for m in metric_cols]
-        add("Mean ± SD over validation cases (size-bin rows: cases without reference lesions in that bin "
-            "are excluded, so n can be smaller). `fp_lesions` = false-positive lesions per scan.\n")
+        add("Mean ± SD over validation cases. Size-bin rows: recall leaves out cases without reference lesions "
+            "in that bin; F1 leaves out cases with no lesion of that size in either mask, so n can be smaller. "
+            "`fp_lesions` = false-positive lesions per scan.\n")
         add(md_table(pd.DataFrame(tbl, index=metric_cols).rename_axis("metric")))
         pooled = fig_recall_by_bin(cases, names, figs / "recall_by_size_bin.png")
         add("\nLesion-level recall pooled over all evaluated cases (detected / reference lesions):\n")
