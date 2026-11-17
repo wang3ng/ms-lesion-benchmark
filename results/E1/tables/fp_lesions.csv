@@ -1,0 +1,5 @@
+scanner,scans,FP lesions,FP / scan,<20 mm³,20-100 mm³,>=100 mm³,median volume (mm³),touching reference
+Siemens Verio 3T,5,16,3.2,11,5,0,11.014064596864046,0
+Siemens Aera 1.5T,5,23,4.6,11,9,3,26.788711547851562,0
+Philips Ingenia 3T,5,53,10.6,41,9,3,10.075624694184846,0
+**all**,15,92,6.133333333333334,63,23,6,11.238292665140772,0

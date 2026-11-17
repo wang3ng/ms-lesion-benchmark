@@ -1,0 +1,13 @@
+scanner,bin,reference,missed,missed_frac,missed_no_overlap,missed_partial_overlap
+siemens_verio_3t,<20,36,27,0.75,27,0
+siemens_verio_3t,20-100,64,21,0.328125,19,2
+siemens_verio_3t,>=100,40,11,0.275,7,4
+siemens_aera_1p5t,<20,7,6,0.8571428571428571,5,1
+siemens_aera_1p5t,20-100,51,23,0.45098039215686275,23,0
+siemens_aera_1p5t,>=100,64,9,0.140625,8,1
+philips_ingenia_3t,<20,84,36,0.42857142857142855,32,4
+philips_ingenia_3t,20-100,128,25,0.1953125,24,1
+philips_ingenia_3t,>=100,67,4,0.05970149253731343,3,1
+all,<20,127,69,0.5433070866141733,64,5
+all,20-100,243,69,0.2839506172839506,66,3
+all,>=100,171,24,0.14035087719298245,18,6

@@ -51,6 +51,14 @@ results/**
 # Midpoint report (summary stats and training curves only; no images or masks).
 !results/midpoint/
 !results/midpoint/**
+# E1 cross-validation report: markdown, figures, aggregate tables. Predictions,
+# per-lesion lists, fold CSVs and test predictions stay local.
+!results/E1/
+!results/E1/cv_summary.md
+!results/E1/figures/
+!results/E1/figures/**
+!results/E1/tables/
+!results/E1/tables/**
 
 # Notebook scratch
 .ipynb_checkpoints/
