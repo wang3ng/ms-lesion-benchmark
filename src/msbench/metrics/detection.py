@@ -123,6 +123,43 @@ def lesion_detection(
     return DetectionResult(n_ref, n_pred, tp_ref, tp_pred, n_pred - tp_pred, p, r, f)
 
 
+def lesion_records(
+    pred: np.ndarray,
+    ref: np.ndarray,
+    spacing: Sequence[float] = (1.0, 1.0, 1.0),
+    connectivity: int = DEFAULT_CONNECTIVITY,
+    min_lesion_mm3: float = DEFAULT_MIN_LESION_MM3,
+    alpha: float = DEFAULT_ALPHA,
+    gamma: float = DEFAULT_GAMMA,
+) -> dict[str, np.ndarray]:
+    """Per-lesion outcome under the same rule as lesion_detection (for error analysis).
+
+    Returns arrays, one entry per reference lesion:
+      ref_volume_mm3, ref_detected, ref_covered_frac (fraction of the lesion covered by any
+      predicted component, ignoring the gamma condition)
+    and one entry per predicted component:
+      pred_volume_mm3, pred_true_positive, pred_overlap_frac (fraction inside the reference mask).
+    Counts agree with lesion_detection / lesion_detection_by_size by construction.
+    """
+    if np.shape(pred) != np.shape(ref):
+        raise ValueError(f"shape mismatch: {np.shape(pred)} vs {np.shape(ref)}")
+    ref_lab, n_ref = label_lesions(ref, spacing, connectivity, min_lesion_mm3)
+    pred_lab, n_pred = label_lesions(pred, spacing, connectivity, min_lesion_mm3)
+    detected, true_pos = _match(ref_lab, n_ref, pred_lab, n_pred, alpha, gamma)
+    ref_sizes = np.bincount(ref_lab.ravel(), minlength=n_ref + 1)[1:]
+    pred_sizes = np.bincount(pred_lab.ravel(), minlength=n_pred + 1)[1:]
+    ref_cov = np.bincount(ref_lab[pred_lab > 0].ravel(), minlength=n_ref + 1)[1:]
+    pred_in = np.bincount(pred_lab[ref_lab > 0].ravel(), minlength=n_pred + 1)[1:]
+    return {
+        "ref_volume_mm3": component_volumes_mm3(ref_lab, n_ref, spacing),
+        "ref_detected": detected,
+        "ref_covered_frac": ref_cov / np.maximum(ref_sizes, 1),
+        "pred_volume_mm3": component_volumes_mm3(pred_lab, n_pred, spacing),
+        "pred_true_positive": true_pos,
+        "pred_overlap_frac": pred_in / np.maximum(pred_sizes, 1),
+    }
+
+
 def lesion_detection_by_size(
     pred: np.ndarray,
     ref: np.ndarray,

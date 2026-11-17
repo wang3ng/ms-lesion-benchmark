@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 
 from msbench.config import load_config, paths
-from msbench.metrics import evaluate_case
+from msbench.metrics import bin_names, evaluate_case, lesion_records
 
 # Column order of the per-case CSV (size-bin columns are appended per bin).
 BASE_COLUMNS = [
@@ -92,3 +92,39 @@ def evaluate_predictions(
     df = pd.DataFrame(rows)
     bin_cols = [c for c in df.columns if c not in BASE_COLUMNS]
     return df[BASE_COLUMNS + bin_cols]
+
+
+def lesion_tables(
+    pred_dir: Path,
+    case_ids: Sequence[str],
+    reference: str = "lesion",
+    cfg: dict | None = None,
+    **extra,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """One row per reference lesion and one per predicted component (error analysis).
+
+    Reference rows: case_id, dataset, scanner, volume_mm3, bin, detected, covered_frac.
+    Predicted rows: case_id, dataset, scanner, volume_mm3, bin, true_positive, overlap_frac.
+    Same lesion rule and bins as evaluate_predictions; `extra` columns (e.g. fold=k) are added.
+    """
+    cfg = cfg or load_config()
+    processed = paths(cfg)["data_processed"]
+    index = pd.read_csv(processed / "index.csv", dtype=str).set_index("case_id")
+    rule, bins = detection_rule(cfg), size_bins(cfg)
+    names = bin_names(bins)
+    ref_rows, pred_rows = [], []
+    for case_id in case_ids:
+        meta = index.loc[case_id]
+        ref, _, spacing = load_mask(processed / meta["path"] / f"{reference}.nii.gz")
+        pred, _, _ = load_mask(Path(pred_dir) / f"{case_id}.nii.gz")
+        r = lesion_records(pred, ref, spacing, **rule)
+        base = {"case_id": case_id, "dataset": meta["dataset"], "scanner": meta["scanner"], **extra}
+        for v, d, c in zip(r["ref_volume_mm3"], r["ref_detected"], r["ref_covered_frac"]):
+            ref_rows.append({**base, "volume_mm3": float(v), "bin": names[int(np.digitize(v, bins))],
+                             "detected": bool(d), "covered_frac": float(c)})
+        for v, t, o in zip(r["pred_volume_mm3"], r["pred_true_positive"], r["pred_overlap_frac"]):
+            pred_rows.append({**base, "volume_mm3": float(v), "bin": names[int(np.digitize(v, bins))],
+                              "true_positive": bool(t), "overlap_frac": float(o)})
+    cols_r = ["case_id", "dataset", "scanner", *extra, "volume_mm3", "bin", "detected", "covered_frac"]
+    cols_p = ["case_id", "dataset", "scanner", *extra, "volume_mm3", "bin", "true_positive", "overlap_frac"]
+    return pd.DataFrame(ref_rows, columns=cols_r), pd.DataFrame(pred_rows, columns=cols_p)

@@ -10,6 +10,7 @@ from msbench.metrics import (
     lesion_count,
     lesion_detection,
     lesion_detection_by_size,
+    lesion_records,
     lesion_volume_histogram,
     lesion_volume_ml,
 )
@@ -114,6 +115,22 @@ def test_detection_by_size_bins():
     assert out["20-100"].n_ref == 1 and out["20-100"].recall == 0.0
     assert out[">=100"].recall == 1.0
     assert out["<20"].n_ref == 0 and out["<20"].f1 == 1.0
+
+
+def test_lesion_records_match_detection_counts():
+    ref = cube(cube(cube(empty(), 10, 10, 10, 6), 32, 32, 32, 1), 10, 32, 32, 2)  # 2197, 27, 125 voxels
+    pred = cube(cube(empty(), 10, 10, 10, 6), 30, 10, 10, 1)  # hits the big lesion + one isolated FP
+    rec = lesion_records(pred, ref)
+    det = lesion_detection(pred, ref)
+    assert rec["ref_detected"].sum() == det.tp_ref and len(rec["ref_detected"]) == det.n_ref == 3
+    assert (~rec["pred_true_positive"]).sum() == det.fp_pred == 1
+    assert sorted(rec["ref_volume_mm3"]) == [27, 125, 2197]
+    fp = ~rec["pred_true_positive"]
+    assert rec["pred_volume_mm3"][fp][0] == 27 and rec["pred_overlap_frac"][fp][0] == 0
+    missed = ~rec["ref_detected"]
+    assert np.all(rec["ref_covered_frac"][missed] == 0)
+    by = lesion_detection_by_size(pred, ref, bin_edges_mm3=[20, 100])
+    assert by["20-100"].n_ref == ((rec["ref_volume_mm3"] >= 20) & (rec["ref_volume_mm3"] < 100)).sum()
 
 
 def test_volume_histogram():

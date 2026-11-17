@@ -12,6 +12,7 @@ from .detection import (
     bin_names,
     lesion_detection,
     lesion_detection_by_size,
+    lesion_records,
     lesion_volume_histogram,
 )
 from .overlap import dice, lesion_count, lesion_volume_ml
@@ -29,6 +30,7 @@ __all__ = [
     "lesion_count",
     "lesion_detection",
     "lesion_detection_by_size",
+    "lesion_records",
     "lesion_volume_histogram",
     "lesion_volume_ml",
 ]
