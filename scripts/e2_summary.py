@@ -184,6 +184,7 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--results-dir", type=Path, default=Path(os.environ.get("MSBENCH_RESULTS", REPO_ROOT / "results")))
     ap.add_argument("--out", type=Path, help="default: <results-dir>/E2")
+    ap.add_argument("--note", type=Path, help="markdown file inserted as a reviewer note below the status line")
     args = ap.parse_args(argv)
 
     cfg = load_config()
@@ -221,6 +222,8 @@ def main(argv=None) -> int:
     else:
         add("> **Complete: all 15 MSSEG training patients, each scored by the fold model that did not train on "
             "them, for all three models.**\n")
+    if args.note:
+        add(args.note.read_text().strip() + "\n")
     ft = cfg["models"]["medsam"]["finetune"]
     add(f"Same patient-level folds for all models (E1's `splits_final.json`). Lesion rule: Anima-port "
         f"({rule['connectivity']}-connected, > {rule['min_lesion_mm3']} mm³, α {rule['alpha']} / β {rule['beta']} / "
