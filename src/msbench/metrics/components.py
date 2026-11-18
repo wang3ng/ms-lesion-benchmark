@@ -7,14 +7,16 @@ from typing import Sequence
 import numpy as np
 from scipy import ndimage
 
-# Neighbourhood used to group voxels into lesions.
-# 26 matches the submitted proposal. The MSSEG-2016 evaluation tool
-# (animaSegPerfAnalyzer) must be checked before the final results; change
-# this value only together with tests/test_metrics.py and the report.
-DEFAULT_CONNECTIVITY = 26
+# Ported from animaSegPerfAnalyzer (Anima 4.2, the MSSEG-2016 evaluation tool):
+# itk::ConnectedComponentImageFilter with its default FullyConnected = off,
+# i.e. face (6-) connectivity in 3D. Verified against the binary on MSSEG
+# training cases (see docs in detection.py). Change only together with
+# tests/test_metrics.py and a note in the commit message.
+DEFAULT_CONNECTIVITY = 6
 
-# Components smaller than this (in mm^3) are ignored, as in the MSSEG-2016
-# evaluation. Verify against animaSegPerfAnalyzer before final results.
+# animaSegPerfAnalyzer --MinLesionVolume (default 3 mm^3). Components are kept
+# only if STRICTLY larger: min voxels = floor(min_mm3 / voxel_volume) + 1
+# (itk::RelabelComponentImageFilter::SetMinimumObjectSize), in both masks.
 DEFAULT_MIN_LESION_MM3 = 3.0
 
 
@@ -31,13 +33,19 @@ def voxel_volume_mm3(spacing: Sequence[float]) -> float:
     return float(np.prod(spacing))
 
 
+def min_lesion_voxels(min_lesion_mm3: float, spacing: Sequence[float]) -> int:
+    """Smallest kept component size in voxels, as in Anima: floor(min_mm3 / voxel volume) + 1."""
+    vv = float(spacing[0]) * float(spacing[1]) * float(spacing[2])  # same product order as Anima
+    return int(np.floor(min_lesion_mm3 / vv)) + 1
+
+
 def label_lesions(
     mask: np.ndarray,
     spacing: Sequence[float] = (1.0, 1.0, 1.0),
     connectivity: int = DEFAULT_CONNECTIVITY,
     min_lesion_mm3: float = DEFAULT_MIN_LESION_MM3,
 ) -> tuple[np.ndarray, int]:
-    """Label lesions in a binary 3D mask, dropping components below min size.
+    """Label lesions in a binary 3D mask, dropping components of volume <= min_lesion_mm3.
 
     Returns (labels, n) where labels are consecutive integers 1..n.
     """
@@ -48,8 +56,7 @@ def label_lesions(
     if n == 0:
         return labels.astype(np.int32), 0
     sizes = np.bincount(labels.ravel())[1:]
-    min_voxels = min_lesion_mm3 / voxel_volume_mm3(spacing)
-    keep = np.flatnonzero(sizes >= min_voxels) + 1
+    keep = np.flatnonzero(sizes >= min_lesion_voxels(min_lesion_mm3, spacing)) + 1
     relabel = np.zeros(n + 1, dtype=np.int32)
     relabel[keep] = np.arange(1, len(keep) + 1, dtype=np.int32)
     return relabel[labels], int(len(keep))

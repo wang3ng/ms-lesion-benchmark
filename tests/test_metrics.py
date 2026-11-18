@@ -178,3 +178,76 @@ def test_stats_drop_nan_pairs():
 def test_bland_altman():
     ba = bland_altman([10, 12, 14], [9, 11, 13])
     assert ba["bias"] == pytest.approx(1.0) and ba["mae"] == pytest.approx(1.0)
+
+
+# ---------- Anima port (animaSegPerfAnalyzer 4.2 semantics) ----------
+
+def box(mask, z0, z1, y0, y1, x0, x1):
+    mask[z0:z1, y0:y1, x0:x1] = 1
+    return mask
+
+
+def test_anima_defaults():
+    from msbench.metrics import DEFAULT_ALPHA, DEFAULT_BETA, DEFAULT_CONNECTIVITY, DEFAULT_GAMMA
+    assert (DEFAULT_CONNECTIVITY, DEFAULT_ALPHA, DEFAULT_BETA, DEFAULT_GAMMA) == (6, 0.10, 0.70, 0.65)
+
+
+def test_anima_default_connectivity_is_face():
+    m = empty()
+    box(m, 5, 8, 5, 8, 5, 8)
+    box(m, 8, 11, 8, 11, 8, 11)  # touches the first block only at a corner
+    assert lesion_count(m) == 2
+
+
+def test_anima_min_size_is_strict():
+    from msbench.metrics.components import min_lesion_voxels
+    assert min_lesion_voxels(3.0, (1, 1, 1)) == 4          # exactly 3 mm^3 is dropped
+    assert min_lesion_voxels(3.0, (0.7, 0.744, 0.744)) == 8
+    three, four = box(empty(), 5, 6, 5, 6, 5, 8), box(empty(), 5, 6, 5, 6, 5, 9)
+    assert lesion_count(three) == 0 and lesion_count(four) == 1
+
+
+def test_anima_alpha_is_strict():
+    ref = box(empty(), 5, 9, 5, 10, 5, 7)                  # 40 voxels
+    exactly_10 = empty()
+    exactly_10[5, 5, 5:7] = 1; exactly_10[6, 5, 5:7] = 1    # 4 voxels inside = 10 %
+    more = exactly_10.copy(); more[7, 5, 5] = 1              # 5 voxels = 12.5 %
+    assert lesion_detection(exactly_10, ref).tp_ref == 0
+    assert lesion_detection(more, ref).tp_ref == 1
+
+
+def test_anima_beta_rejects_oversized_component():
+    ref = cube(empty(), 20, 20, 20, 1)                       # 27 voxels
+    pred = cube(empty(), 20, 20, 20, 4)                      # 729 voxels, 96 % outside
+    det = lesion_detection(pred, ref)
+    assert det.tp_ref == 0 and det.fp_pred == 1
+
+
+def test_anima_gamma_only_checks_the_main_overlaps():
+    ref = box(empty(), 10, 12, 10, 20, 10, 20)               # 200 voxels
+    good = box(empty(), 10, 12, 10, 17, 10, 20)              # 140 voxels, all inside (70 % of overlap)
+    bad = box(empty(), 10, 12, 18, 20, 10, 20)               # 40 inside ...
+    bad = box(bad, 10, 12, 21, 39, 10, 20)                   # ... + 360 outside, not connected to `good`
+    bad[10:12, 20, 10:20] = 1                                # bridge stays outside the reference
+    pred = np.maximum(good, bad)
+    rec = lesion_records(pred, ref)
+    assert rec["ref_detected"].tolist() == [True]            # first 65 % of overlap comes from `good`
+    swapped = box(empty(), 10, 12, 10, 13, 10, 20)           # good part now only 60 voxels (30 %)
+    swapped = np.maximum(swapped, box(empty(), 10, 12, 14, 39, 10, 20))  # bad part: 120 in, 380 out
+    assert lesion_records(swapped, ref)["ref_detected"].tolist() == [False]
+
+
+def test_anima_precision_uses_the_swapped_test():
+    ref = box(empty(), 5, 15, 5, 15, 5, 15)                  # 1000 voxels
+    pred = box(empty(), 5, 15, 5, 15, 5, 7)                  # 200 voxels, all inside -> covers 20 %
+    det = lesion_detection(pred, ref)
+    assert det.tp_ref == 1                                   # 20 % > alpha, component 0 % outside
+    assert det.tp_pred == 0 and det.precision == 0.0         # the lesion is 80 % uncovered > beta
+
+
+def test_anima_empty_conventions():
+    ref = cube(empty(), 20, 20, 20, 2)
+    none = lesion_detection(empty(), ref)
+    assert (none.precision, none.recall, none.f1) == (0.0, 0.0, 0.0)
+    fp_only = lesion_detection(ref, empty())
+    assert fp_only.precision == 0.0 and math.isnan(fp_only.recall) and fp_only.f1 == 0.0

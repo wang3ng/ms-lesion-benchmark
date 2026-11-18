@@ -57,15 +57,20 @@ boxes:
 metrics:
   voxel_dice: {empty_both: 1.0}
   lesion_detection:
-    rule: msseg2016             # Commowick et al., Sci Rep 2018
-    connectivity: 26            # VERIFY against animaSegPerfAnalyzer
-    min_lesion_mm3: 3.0         # VERIFY against animaSegPerfAnalyzer
-    alpha: 0.10                 # min overlap fraction
-    gamma: 0.65                 # max fraction of a predicted lesion outside the reference
-  # Fixed 2026-11-15 from MSSEG TRAINING-set consensus counts only
-  # (scripts/lesion_size_bins.py; 541 lesions, 26-conn, >=3 mm^3):
-  # <20: 127, 20-100: 243, >=100: 171. Candidates [10,20,50,100,500] gave
-  # 55/72/138/105/134/37. Do not change after looking at any test result.
+    # Port of animaSegPerfAnalyzer 4.2 (MSSEG-2016 tool, Commowick et al., Sci Rep
+    # 2018); values = its command-line defaults. Verified against the binary on
+    # MSSEG training cases (scripts/anima_check.py, 2026-11-17).
+    rule: anima_segperf_4.2
+    connectivity: 6             # ITK ConnectedComponentImageFilter default (face neighbours)
+    min_lesion_mm3: 3.0         # -v; components must be STRICTLY larger, in both masks
+    alpha: 0.10                 # -x; min covered fraction (strictly greater)
+    beta: 0.70                  # -y; max fraction of an overlapping component outside the other mask
+    gamma: 0.65                 # -z; share of the overlap whose components are checked against beta
+  # Edges fixed 2026-11-15 from MSSEG TRAINING-set consensus counts only
+  # (scripts/lesion_size_bins.py). Counts recomputed 2026-11-17 with the
+  # Anima-port rule (6-conn, > 3 mm^3): 557 lesions, <20: 133, 20-100: 252,
+  # >=100: 172 (was 541 = 127/243/171 with 26-conn, >= 3 mm^3). Edges unchanged.
+  # Do not change after looking at any test result.
   size_bins_mm3: [20, 100]
   report: [dice, lesion_precision, lesion_recall, lesion_f1, size_bin_f1,
            fp_lesions_per_scan, lesion_count, lesion_volume_ml]

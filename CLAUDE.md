@@ -26,7 +26,7 @@ Each MedSAM box condition gets its **own fine-tune**, using the same box type at
 - **Test settings:** MSSEG in-distribution test (Siemens/Philips), MSSEG GE Discovery (8 unseen-scanner exams, report per case), ISBI 2015 (21 labeled scans, score each rater separately).
 - **Metrics (one shared implementation in `src/msbench/metrics`):** voxel Dice; lesion-wise precision / recall / F1 under the MSSEG rule; F1 within lesion-volume bins whose edges are fixed from MSSEG **training-set** counts; false-positive lesions per scan; lesion count and volume (mL) agreement.
 - **Statistics:** paired Wilcoxon signed-rank across patients, bootstrap 95% CIs.
-- **Connectivity for lesion components:** pending verification against `animaSegPerfAnalyzer`; do not change the constant without updating the tests and noting it in the commit message.
+- **Lesion detection rule:** port of `animaSegPerfAnalyzer` 4.2 (6-connected components, lesions > 3 mm³, α 0.10 / β 0.70 / γ 0.65), verified against the binary on all 15 MSSEG training patients (`scripts/anima_check.py`). Do not change it without updating the tests and noting it in the commit message.
 - Test data are not used for any choice (thresholds, bins, epochs, fix selection).
 
 ## Data rules (data use agreements apply)

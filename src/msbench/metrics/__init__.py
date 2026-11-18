@@ -7,6 +7,7 @@ import numpy as np
 from .components import DEFAULT_CONNECTIVITY, DEFAULT_MIN_LESION_MM3, label_lesions
 from .detection import (
     DEFAULT_ALPHA,
+    DEFAULT_BETA,
     DEFAULT_GAMMA,
     DetectionResult,
     bin_names,
@@ -19,6 +20,7 @@ from .overlap import dice, lesion_count, lesion_volume_ml
 
 __all__ = [
     "DEFAULT_ALPHA",
+    "DEFAULT_BETA",
     "DEFAULT_CONNECTIVITY",
     "DEFAULT_GAMMA",
     "DEFAULT_MIN_LESION_MM3",

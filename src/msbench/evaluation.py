@@ -28,9 +28,9 @@ BIN_FIELDS = ["recall", "f1", "precision", "n_ref", "detected", "n_pred"]
 
 
 def detection_rule(cfg: dict) -> dict:
-    """Lesion rule parameters from the config (connectivity, min size, alpha, gamma)."""
+    """Lesion rule parameters from the config (connectivity, min size, alpha, beta, gamma)."""
     r = cfg["metrics"]["lesion_detection"]
-    return {k: r[k] for k in ("connectivity", "min_lesion_mm3", "alpha", "gamma")}
+    return {k: r[k] for k in ("connectivity", "min_lesion_mm3", "alpha", "beta", "gamma")}
 
 
 def size_bins(cfg: dict) -> list[float]:
