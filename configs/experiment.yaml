@@ -42,7 +42,21 @@ experiments:
   E2b: {model: medsam, boxes: nnunet}         # needs E1 predictions
   E2c: {model: medsam, boxes: independent}    # the fair head-to-head with E1
   E6:  {analysis: biomarkers, models: [E1, best_medsam]}
-  E8:  {fix: choose_after_E2a_vs_E2c}         # zoomed_tiles OR small_lesion_loss
+  E8:                                         # zoomed_tiles OR small_lesion_loss
+    fix: choose_after_E2a_vs_E2c
+    # Decision rule, fixed 2026-11-17 BEFORE any MedSAM training. Inputs:
+    # pooled lesion-level recall in the <20 mm^3 bin (detected / reference
+    # lesions summed over patients, Anima-port rule, MSSEG consensus), from the
+    # 5-fold cross-validation predictions on the 15 MSSEG training patients.
+    # Never computed on any test set. Rules are checked in order.
+    decision_rule:
+      metric: pooled_recall_lt20_cv
+      rules:
+        - if: "recall(E2a) - recall(E2c) >= 0.15"
+          then: zoomed_tiles              # MedSAM can trace small lesions but does not find them
+        - if: "recall(E2a) < 0.6"
+          then: small_lesion_loss         # even with oracle boxes small lesions are traced poorly
+        - else: zoomed_tiles
 
 boxes:
   independent:
