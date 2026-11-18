@@ -19,6 +19,7 @@ from msbench.stats import (
     bootstrap_ci,
     bootstrap_ratio_ci,
     paired_bootstrap_diff_ci,
+    paired_bootstrap_ratio_diff_ci,
     paired_wilcoxon,
 )
 
@@ -168,6 +169,16 @@ def test_bootstrap_ratio_ci_pools_whole_patients():
     same = bootstrap_ratio_ci([3, 6, 9], [3, 6, 9], n_boot=500)
     assert same["low"] == same["high"] == 1.0
     assert math.isnan(bootstrap_ratio_ci([0, 0], [0, 0])["estimate"])
+
+
+def test_paired_bootstrap_ratio_diff():
+    den = [10, 4, 0, 6]
+    a, b = [8, 3, 0, 5], [5, 2, 0, 3]
+    ci = paired_bootstrap_ratio_diff_ci(a, b, den, n_boot=2000)
+    assert ci["estimate"] == pytest.approx((16 - 10) / 20)
+    assert 0 < ci["low"] <= ci["estimate"] <= ci["high"]
+    same = paired_bootstrap_ratio_diff_ci(a, a, den, n_boot=200)
+    assert same["low"] == same["high"] == 0
 
 
 def test_stats_drop_nan_pairs():

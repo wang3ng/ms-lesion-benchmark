@@ -46,9 +46,10 @@ from msbench.evaluation import lesion_tables
 from msbench.metrics import bin_names
 from msbench.reporting import (
     INK, INK2, MAIN_METRICS, SCANNER_COLORS, SCANNER_LABELS, SURFACE, fig_agreement_scatter,
-    fold_wall_time, job_alive, mask_empty_bins, md_table, new_fig, save_fig,
+    fmt_ci, fmt_interval, fold_wall_time, job_alive, mask_empty_bins, md_table, new_fig, patient_stats,
+    pooled_bin_recall, save_fig,
 )
-from msbench.stats import bland_altman, bootstrap_ci, bootstrap_ratio_ci
+from msbench.stats import bland_altman
 from msbench.summaries import nnunet_training_progress
 
 BAR_NEUTRAL = "#d3d2cd"
@@ -104,53 +105,6 @@ def load_folds(args, cfg, splits: list[dict], alive: bool) -> tuple[pd.DataFrame
 
 
 # ---------------------------------------------------------------- statistics
-def patient_stats(cases: pd.DataFrame, metrics: list[str], ci_kw: dict) -> pd.DataFrame:
-    out = []
-    for m in metrics:
-        x = pd.to_numeric(cases[m], errors="coerce").dropna().to_numpy()
-        ci = bootstrap_ci(x, **ci_kw)
-        out.append({
-            "metric": m, "n": len(x),
-            "mean": x.mean() if len(x) else np.nan,
-            "sd": x.std(ddof=1) if len(x) > 1 else np.nan,
-            "median": np.median(x) if len(x) else np.nan,
-            "ci_low": ci["low"] if len(x) > 1 else np.nan,
-            "ci_high": ci["high"] if len(x) > 1 else np.nan,
-        })
-    return pd.DataFrame(out)
-
-
-def pooled_bin_recall(cases: pd.DataFrame, names: list[str], ci_kw: dict) -> pd.DataFrame:
-    """Lesion-level recall per bin (sum detected / sum reference), overall and per scanner."""
-    rows = []
-    groups = [("all", cases)] + [(s, cases[cases.scanner == s]) for s in SCANNER_COLORS if s in set(cases.scanner)]
-    for group, c in groups:
-        for b in names:
-            det, ref = c[f"detected_{b}"].to_numpy(float), c[f"n_ref_{b}"].to_numpy(float)
-            ci = bootstrap_ratio_ci(det, ref, **ci_kw) if len(c) > 1 else {"low": np.nan, "high": np.nan}
-            rows.append({
-                "scanner": group, "bin_mm3": b, "patients": len(c),
-                "patients_with_lesions_in_bin": int((ref > 0).sum()),
-                "detected": int(det.sum()), "reference_lesions": int(ref.sum()),
-                "recall": det.sum() / ref.sum() if ref.sum() else np.nan,
-                "ci_low": ci["low"], "ci_high": ci["high"],
-            })
-    return pd.DataFrame(rows)
-
-
-def fmt_ci(r) -> str:
-    if np.isnan(r["mean"]):
-        return "–"
-    s = f"{r['mean']:.3f}"
-    if not np.isnan(r["sd"]):
-        s += f" ± {r['sd']:.3f}"
-    return s
-
-
-def fmt_interval(lo, hi) -> str:
-    return "–" if np.isnan(lo) else f"[{lo:.3f}, {hi:.3f}]"
-
-
 # ---------------------------------------------------------------- figures
 def fig_recall_by_bin(rec: pd.DataFrame, names: list[str], out: Path) -> None:
     """Pooled recall per bin with patient-bootstrap CI; per-scanner pooled recall as markers."""

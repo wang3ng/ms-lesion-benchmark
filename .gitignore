@@ -59,6 +59,13 @@ results/**
 !results/E1/figures/**
 !results/E1/tables/
 !results/E1/tables/**
+# E2 comparison report (same rule: markdown, figures, aggregate tables only)
+!results/E2/
+!results/E2/cv_summary.md
+!results/E2/figures/
+!results/E2/figures/**
+!results/E2/tables/
+!results/E2/tables/**
 
 # Notebook scratch
 .ipynb_checkpoints/

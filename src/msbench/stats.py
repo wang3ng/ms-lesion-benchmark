@@ -107,6 +107,33 @@ def paired_bootstrap_diff_ci(
     }
 
 
+def paired_bootstrap_ratio_diff_ci(
+    num_a: Sequence[float],
+    num_b: Sequence[float],
+    denominator: Sequence[float],
+    n_boot: int = 10_000,
+    level: float = 0.95,
+    seed: int = 20261011,
+) -> dict:
+    """CI for sum(num_a)/sum(den) - sum(num_b)/sum(den), resampling whole cases for both.
+
+    For pooled lesion-level recall of two models on the same reference lesions
+    (num = detected lesions per patient, den = reference lesions per patient).
+    """
+    a, b, d = (np.asarray(x, float) for x in (num_a, num_b, denominator))
+    if not (a.shape == b.shape == d.shape):
+        raise ValueError("inputs must have the same length")
+    if len(d) == 0 or d.sum() == 0:
+        return {"n": int(len(d)), "estimate": float("nan"), "low": float("nan"), "high": float("nan")}
+    rng = np.random.default_rng(seed)
+    idx = rng.integers(0, len(d), size=(n_boot, len(d)))
+    den = d[idx].sum(axis=1)
+    ok = den > 0
+    boots = (a[idx].sum(axis=1)[ok] - b[idx].sum(axis=1)[ok]) / den[ok]
+    lo, hi = np.quantile(boots, [(1 - level) / 2, 1 - (1 - level) / 2])
+    return {"n": int(len(d)), "estimate": float((a.sum() - b.sum()) / d.sum()), "low": float(lo), "high": float(hi)}
+
+
 def bland_altman(auto: Sequence[float], manual: Sequence[float]) -> dict:
     """Bland-Altman agreement between automatic and manual measurements.
 
