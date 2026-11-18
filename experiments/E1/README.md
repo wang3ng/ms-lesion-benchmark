@@ -53,11 +53,11 @@ scanner), MSSEG consensus reference. Total training ≈ 46 GPU-hours.
 
 | fold | wall time | s / epoch | nnU-Net val Dice | our Dice (mean of 3) | lesion F1 (mean of 3) | FP lesions / scan |
 |---|---|---|---|---|---|---|
-| 0 | 9 h 12 min | 32.4 | 0.753 | 0.753 | 0.682 | 5.0 |
-| 1 | 9 h 10 min | 32.3 | 0.762 | 0.762 | 0.810 | 6.3 |
-| 2 | 9 h 11 min | 32.4 | 0.838 | 0.838 | 0.629 | 6.7 |
-| 3 | 9 h 10 min | 32.3 | 0.783 | 0.783 | 0.720 | 7.3 |
-| 4 | 9 h 11 min | 32.3 | 0.700 | 0.700 | 0.761 | 5.3 |
+| 0 | 9 h 12 min | 32.4 | 0.753 | 0.753 | 0.640 | 7.7 |
+| 1 | 9 h 10 min | 32.3 | 0.762 | 0.762 | 0.795 | 7.3 |
+| 2 | 9 h 11 min | 32.4 | 0.838 | 0.838 | 0.603 | 10.3 |
+| 3 | 9 h 10 min | 32.3 | 0.783 | 0.783 | 0.683 | 9.7 |
+| 4 | 9 h 11 min | 32.3 | 0.700 | 0.700 | 0.747 | 6.7 |
 
 Pooled over the 15 patients (mean ± SD, bootstrap 95% CI of the mean;
 full report [`results/E1/cv_summary.md`](../../results/E1/cv_summary.md)):
@@ -65,15 +65,20 @@ full report [`results/E1/cv_summary.md`](../../results/E1/cv_summary.md)):
 | metric | value |
 |---|---|
 | Dice | 0.767 ± 0.082 [0.728, 0.807] |
-| lesion precision | 0.806 ± 0.098 [0.755, 0.851] |
-| lesion recall | 0.683 ± 0.185 [0.590, 0.770] |
-| lesion F1 | 0.721 ± 0.128 [0.657, 0.783] |
-| FP lesions / scan | 6.1 ± 4.6 [4.0, 8.5] |
-| pooled recall <20 / 20–100 / ≥100 mm³ | 0.46 (58/127) / 0.72 (174/243) / 0.86 (147/171) |
+| lesion precision | 0.734 ± 0.115 [0.675, 0.787] |
+| lesion recall | 0.687 ± 0.183 [0.594, 0.774] |
+| lesion F1 | 0.693 ± 0.133 [0.629, 0.758] |
+| FP lesions / scan | 8.3 ± 4.8 [6.1, 10.7] |
+| pooled recall <20 / 20–100 / ≥100 mm³ | 0.47 (63/133) / 0.71 (180/252) / 0.87 (149/172) |
 
-Missed lesions are mostly small and mostly untouched by the prediction (148 of 162 missed lesions have
-no predicted voxel). 63 of 92 false-positive lesions (68%) are < 20 mm³; Philips Ingenia has the most
-FPs (10.6 / scan vs 3.2 Verio, 4.6 Aera).
+Missed lesions are mostly small and mostly untouched by the prediction (153 of 165 missed lesions have
+no predicted voxel). 83 of 125 false-positive lesions (66%) are < 20 mm³; Philips Ingenia has the most
+FPs (13.0 / scan vs 5.0 Verio, 7.0 Aera).
+
+**Lesion rule.** All lesion-level numbers use the port of animaSegPerfAnalyzer 4.2 (6-connected,
+> 3 mm³, α 0.10 / β 0.70 / γ 0.65), which matches the binary to its printed precision on all 15
+training patients (nnU-Net out-of-fold + 7 experts each, 120/120; `results/E1/tables/anima_check_all15.csv`).
+The earlier 26-connected placeholder rule gave precision 0.806, F1 0.721, 6.1 FP/scan; Dice is unaffected.
 
 Out-of-fold predictions for all 15 training patients (input for E2b): `$nnUNet_results/Dataset501_MSSEG2016/
 nnUNetTrainer__nnUNetPlans__3d_fullres/fold_<k>/validation/<case_id>.{nii.gz,npz}`, copied to

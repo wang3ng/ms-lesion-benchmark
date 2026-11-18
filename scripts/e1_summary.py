@@ -316,8 +316,8 @@ def main(argv=None) -> int:
         add(f"> ⚠ {w}\n")
     add(f"Trainer `{nnunet_trainer(cfg)}`, {epochs} epochs in every fold; patient-level folds stratified by "
         f"scanner (one patient per scanner per fold), seed {cfg['seed']}. Lesion rule: "
-        f"{rule['connectivity']}-connected components ≥ {rule['min_lesion_mm3']} mm³, α = {rule['alpha']}, "
-        f"γ = {rule['gamma']} (pending check against animaSegPerfAnalyzer). Size bins (from MSSEG training counts): "
+        f"{rule['connectivity']}-connected components > {rule['min_lesion_mm3']} mm³, α = {rule['alpha']}, "
+        f"β = {rule.get('beta', '–')}, γ = {rule['gamma']} (port of animaSegPerfAnalyzer 4.2, verified on all 15 training patients). Size bins (from MSSEG training counts): "
         f"{', '.join(names)} mm³. Reference: MSSEG consensus. **No test case is used here.**\n")
 
     add("## Folds\n")
@@ -446,8 +446,9 @@ def main(argv=None) -> int:
         missed.to_csv(tables / "missed_lesions.csv", index=False)
         add(f"### Missed lesions ({len(miss)} of {len(refl)} reference lesions)\n")
         add("Cell = missed / reference (% missed). A missed lesion either has no predicted voxel on it at all, "
-            f"or is partly covered but fails the rule (covered < α = {rule['alpha']} by components that are "
-            f"not too large, γ = {rule['gamma']}).\n")
+            f"or is partly covered but fails the rule (covered fraction ≤ α = {rule['alpha']}, or one of the "
+            f"predicted components making up the first γ = {rule['gamma']} of the overlap lies more than "
+            f"β = {rule.get('beta', '–')} outside the consensus).\n")
         cell = missed.assign(cell=[f"{m} / {n} ({'–' if np.isnan(fr) else f'{100 * fr:.0f}%'})"
                                    for m, n, fr in zip(missed.missed, missed.reference, missed.missed_frac)])
         mp = cell.pivot(index="scanner", columns="bin", values="cell")[names]
@@ -469,10 +470,12 @@ def main(argv=None) -> int:
         add(f"**{n_small} of {len(fp)} false-positive lesions ({100 * n_small / max(len(fp), 1):.0f}%) are smaller "
             f"than {small_edge:g} mm³.** Median FP volume {fp.volume_mm3.median():.1f} mm³ "
             f"(IQR {fp.volume_mm3.quantile(.25):.1f}–{fp.volume_mm3.quantile(.75):.1f}); "
-            f"{int((fp.overlap_frac > 0).sum())} FP lesions touch a reference lesion but have < α = {rule['alpha']} "
-            f"of their volume inside it; the other {int((fp.overlap_frac == 0).sum())} lie entirely outside the "
-            f"consensus. Minimum component size is {rule['min_lesion_mm3']} mm³ (smaller components are discarded "
-            "in both masks).\n")
+            f"{int((fp.overlap_frac == 0).sum())} lie entirely outside the consensus; "
+            f"{int(((fp.overlap_frac > 0) & (fp.overlap_frac <= rule['alpha'])).sum())} touch a reference lesion "
+            f"with ≤ α = {rule['alpha']} of their volume inside; {int((fp.overlap_frac > rule['alpha']).sum())} lie "
+            f"mostly inside a reference lesion that is more than β = {rule.get('beta', '–')} uncovered by the "
+            "prediction (Anima counts a small prediction inside a large, mostly missed lesion as a false positive). "
+            f"Components ≤ {rule['min_lesion_mm3']} mm³ are discarded in both masks.\n")
         frows = []
         for s in [s for s in SCANNER_COLORS if s in set(predl.scanner)] + ["all"]:
             fs = fp if s == "all" else fp[fp.scanner == s]

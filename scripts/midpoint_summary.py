@@ -124,8 +124,9 @@ def main(argv=None) -> int:
     add = md.append
     add(f"# Midpoint summary — {args.exp} (nnU-Net v2 {cfg['models']['nnunet']['configuration']}, MSSEG-2016)\n")
     add(f"Generated {dt.datetime.now():%Y-%m-%d %H:%M} from commit `{commit}` by `scripts/midpoint_summary.py`. "
-        f"Lesion rule: {rule['connectivity']}-connected components ≥ {rule['min_lesion_mm3']} mm³, "
-        f"α = {rule['alpha']}, γ = {rule['gamma']} (pending check against animaSegPerfAnalyzer). "
+        f"Lesion rule: {rule['connectivity']}-connected components > {rule['min_lesion_mm3']} mm³, "
+        f"α = {rule['alpha']}, β = {rule.get('beta', '–')}, γ = {rule['gamma']} "
+        "(port of animaSegPerfAnalyzer 4.2). "
         f"Size bins (fixed from MSSEG training counts): {', '.join(names)} mm³. "
         "All metrics below are on **cross-validation folds of the 15 MSSEG training cases**; "
         "no test case has been scored.\n")
