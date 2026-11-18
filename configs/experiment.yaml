@@ -45,7 +45,8 @@ models:
     finetune:
       trainable: [prompt_encoder, mask_decoder]
       batch_size: 16
-      steps: 4000               # same for all conditions/folds; change only uniformly
+      steps: 10000              # decided 2026-11-17 before any MedSAM training (benchmark 0.04 s/step);
+                                # same for E2a, E2b, E2c and E8, every fold
       lr: 1.0e-4
       weight_decay: 0.01
       warmup_steps: 200
