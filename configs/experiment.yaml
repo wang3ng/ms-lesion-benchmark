@@ -11,6 +11,9 @@ paths:
   data_processed: ../data/processed
   nnunet_root: ../nnunet         # nnUNet_raw / nnUNet_preprocessed / nnUNet_results
   logs: logs
+  medsam_checkpoint: ../models/medsam/medsam_vit_b.pth   # official MedSAM ViT-B (bowang-lab, 2023-08)
+  medsam_cache: ../cache/medsam_embeddings              # frozen-encoder embeddings, one .npy per case
+  medsam_runs: ../medsam_runs                           # fine-tuned decoders + predictions
 
 primary_dataset: msseg2016
 development_dataset: mslesseg   # for debugging pipelines only; not in final tables
@@ -29,10 +32,31 @@ models:
     epochs: 1000                # if reduced, reduce for ALL folds and record it
   medsam:
     checkpoint: medsam_vit_b
-    input: axial_slices         # channels = flair, t1, t2
+    input: axial_slices         # channels = flair, t1, t2 (each clipped to 0.5-99.5 pct in brain, [0, 1])
+    slice_geometry: keep_aspect_pad_1024   # physical aspect kept, zero-padded to 1024 x 1024
+    slices: brain                # slices with any brain-mask voxel (ISBI: FLAIR != 0)
     freeze_image_encoder: true  # train prompt encoder + mask decoder only
     cache_embeddings: true
+    embedding_dtype: float16
     reconstruction: stack_axial_slices
+    # Fine-tuning (scripts/train_medsam.py), identical for every box condition and
+    # fold; fixed 2026-11-17 before any MedSAM training. Folds = E1's
+    # experiments/E1/splits_final.json. No early stopping: the last step is used.
+    finetune:
+      trainable: [prompt_encoder, mask_decoder]
+      batch_size: 16
+      steps: 4000               # same for all conditions/folds; change only uniformly
+      lr: 1.0e-4
+      weight_decay: 0.01
+      warmup_steps: 200
+      loss: dice_plus_bce        # as MedSAM: monai DiceLoss(sigmoid, squared_pred) + BCE, 1024 x 1024
+      target: reference_inside_box   # target = consensus mask restricted to the box
+      positive_fraction: 0.5     # E2c/E2b: share of boxes with lesion voxels per batch (rest: empty boxes)
+      mixed_precision: bf16
+    inference:
+      combine: mean_prob_over_covering_boxes   # per pixel: mean sigmoid over the boxes that cover it
+      threshold: 0.5
+      batch_size: 64
 
 # Each MedSAM condition is fine-tuned separately, with the same box type
 # at training and test time.
@@ -66,7 +90,11 @@ boxes:
       overlap: 0.25
       include_empty_tiles: true # so MedSAM learns to output an empty mask
   oracle:
+    jitter_px: [0, 5]           # each side pushed out by U{0..5} voxels (train: new draw per sample; test: seeded)
+    components: 2d_8_connected  # one box per lesion component in each axial slice
+  nnunet:                       # E2b: same as oracle but from E1 predictions (OOF for training patients)
     jitter_px: [0, 5]
+    components: 2d_8_connected
 
 metrics:
   voxel_dice: {empty_both: 1.0}
