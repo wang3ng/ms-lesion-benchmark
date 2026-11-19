@@ -51,7 +51,36 @@ models:
       weight_decay: 0.01
       warmup_steps: 200
       loss: dice_plus_bce        # as MedSAM: monai DiceLoss(sigmoid, squared_pred) + BCE, 1024 x 1024
+      # dice_on: which boxes get the per-box Dice term; BCE is always on every box.
+      # POST-HOC CORRECTION 2026-11-19: the first E2c run used Dice on all boxes
+      # (all_boxes) and collapsed on the training folds (constant empty output,
+      # loss plateau ~0.5; experiments/E2/README.md). Changed to lesion_boxes after
+      # that run, from training-fold behaviour only; no test data involved. Same
+      # loss for E2a, E2b, E2c and E8. E2a is unaffected (every E2a box contains
+      # lesion voxels, so both settings give the identical loss; not rerun).
+      dice_on: lesion_boxes
       target: reference_inside_box   # target = consensus mask restricted to the box
+      # Training-data-only collapse check (added 2026-11-19 with the correction).
+      # Windows of `window` steps: start = steps 1..window, check = the `window`
+      # steps ending at `at_step`, then again every `repeat_every` steps and at
+      # the last step. The fold is stopped (no prediction, collapse_check.json,
+      # exit code 3) if the lesion-box loss has not fallen to
+      # <= max_lesion_loss_ratio x its start value, or if fewer than
+      # min_lesion_nonempty of the lesion boxes get a non-empty prediction (any
+      # logit > 0 inside the box), i.e. almost all predictions empty. For E2c both
+      # criteria are also applied to the brain box and the tiles separately (kinds
+      # with >= min_boxes_per_kind lesion boxes per window). Repeat + per-kind
+      # added before the rerun: a 3,000-step replay of the first-run loss on fold 1
+      # (training patients) passed a single pooled check at step 3,000 (ratio 0.68,
+      # non-empty 0.58), but by step 10,000 only 5% of lesion tiles were non-empty
+      # while the brain box over-segmented.
+      collapse_check:
+        at_step: 3000
+        repeat_every: 1000
+        window: 100
+        max_lesion_loss_ratio: 0.8
+        min_lesion_nonempty: 0.10
+        min_boxes_per_kind: 30
       positive_fraction: 0.5     # E2c/E2b: share of boxes with lesion voxels per batch (rest: empty boxes)
       mixed_precision: bf16
     inference:

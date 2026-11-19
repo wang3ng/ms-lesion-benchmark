@@ -26,6 +26,7 @@ from msbench.medsam.model import decode, load_medsam
 from msbench.medsam.slices import SIDE, SliceGeometry, from_canonical, to_canonical
 
 CONDITIONS = {"E2a": "oracle", "E2b": "nnunet", "E2c": "independent"}
+BOX_KINDS = ("component", "brain", "tile")  # E2a/E2b component boxes; E2c brain box and tiles
 
 
 # ---------------------------------------------------------------- per-case data
@@ -125,8 +126,9 @@ class BoxSampler:
     def counts(self) -> dict:
         return {"positive_boxes_or_slices": len(self.pos), "negative_boxes": len(self.neg)}
 
-    def draw(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """One sample: embedding (256,64,64) float32, box in 1024 px (4,), target (1024,1024) bool."""
+    def draw(self) -> tuple[np.ndarray, np.ndarray, np.ndarray, int]:
+        """One sample: embedding (256,64,64) float32, box in 1024 px (4,), target (1024,1024) bool,
+        box kind (BOX_KINDS index: component box, E2c brain box or E2c tile)."""
         use_neg = self.condition != "oracle" and self.neg and self.rng.random() >= self.pos_frac
         ci, k, bi = (self.neg if use_neg else self.pos)[self.rng.integers(len(self.neg if use_neg else self.pos))]
         cd = self.cases[ci]
@@ -142,7 +144,8 @@ class BoxSampler:
                 box = jitter_boxes(box[None], cd.geom.shape, jit, self.rng)[0]
         target = cd.geom.mask_to_1024(ref2d & box_mask(box, cd.geom.shape))
         emb = np.asarray(cd.emb[k], dtype=np.float32)
-        return emb, cd.geom.box_to_1024(box).astype(np.float32), target
+        kind = 0 if self.condition != "independent" else (1 if bi == 0 else 2)  # box 0 = brain box
+        return emb, cd.geom.box_to_1024(box).astype(np.float32), target, kind
 
 
 class SampleStream(torch.utils.data.IterableDataset):
@@ -167,11 +170,135 @@ def load_trainable(model, state: dict) -> None:
     model.mask_decoder.load_state_dict(state["mask_decoder"])
 
 
+DICE_ON = ("lesion_boxes", "all_boxes")
+
+
+def box_loss_terms(logits: torch.Tensor, tgt: torch.Tensor, dice_fn) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Per-box terms for logits/targets of shape (B, 1, H, W): (dice (B,), bce (B,), has_lesion (B,) bool).
+
+    dice_fn is monai DiceLoss(sigmoid=True, squared_pred=True, reduction="none").
+    """
+    b = logits.shape[0]
+    dice = dice_fn(logits, tgt).reshape(b)
+    bce = F.binary_cross_entropy_with_logits(logits, tgt, reduction="none").reshape(b, -1).mean(1)
+    lesion = tgt.reshape(b, -1).amax(1) > 0
+    return dice, bce, lesion
+
+
+def combine_loss(dice: torch.Tensor, bce: torch.Tensor, lesion: torch.Tensor, dice_on: str) -> torch.Tensor:
+    """Training loss: BCE averaged over every box + per-box Dice averaged over the boxes in `dice_on`.
+
+    "all_boxes" equals monai DiceLoss(reduction="mean") + BCEWithLogitsLoss() (the first E2c run);
+    "lesion_boxes" leaves boxes with an empty target out of the Dice mean (Dice of an empty target is
+    ~0 only for an exactly empty output, which pushes every box towards empty). Both give the same
+    loss when every box contains lesion voxels (E2a).
+    """
+    if dice_on == "all_boxes":
+        d = dice.mean()
+    elif dice_on == "lesion_boxes":
+        d = dice[lesion].mean() if bool(lesion.any()) else dice.sum() * 0.0
+    else:
+        raise ValueError(f"dice_on must be one of {DICE_ON}")
+    return d + bce.mean()
+
+
+def box_nonempty(logits: torch.Tensor, boxes_1024: torch.Tensor) -> torch.Tensor:
+    """(B,) bool: any logit > 0 inside the box (the region used at inference), logits (B, 1, H, W)."""
+    _, _, h, w = logits.shape
+    ys = torch.arange(h, device=logits.device)[None, :, None]
+    xs = torch.arange(w, device=logits.device)[None, None, :]
+    x0, y0, x1, y1 = (boxes_1024[:, i, None, None] for i in range(4))
+    inside = (xs >= x0.floor()) & (xs < x1.ceil()) & (ys >= y0.floor()) & (ys < y1.ceil())
+    return ((logits[:, 0] > 0) & inside).flatten(1).any(1)
+
+
+class WindowStats:
+    """Accumulates the per-box monitoring numbers over one logging window."""
+
+    KEYS = ("loss", "lesion_loss", "lesion_dice", "lesion_nonempty", "empty_loss", "empty_nonempty")
+
+    def __init__(self):
+        self.sums = {k: 0.0 for k in self.KEYS}
+        self.n = {"steps": 0, "lesion": 0, "empty": 0}
+        self.kind = {}  # kind -> [n lesion boxes, lesion loss sum, non-empty sum]
+
+    def add(self, loss, dice, bce, lesion, nonempty, dice_on, kind=None):
+        per_box = bce + dice * (lesion if dice_on == "lesion_boxes" else torch.ones_like(lesion)).float()
+        nl, ne = int(lesion.sum()), int((~lesion).sum())
+        if kind is not None:
+            for kd in kind[lesion].unique().tolist():
+                sel = lesion & (kind == kd)
+                acc = self.kind.setdefault(BOX_KINDS[kd], [0, 0.0, 0.0])
+                acc[0] += int(sel.sum())
+                acc[1] += float(per_box[sel].sum())
+                acc[2] += float(nonempty[sel].sum())
+        self.n["steps"] += 1
+        self.sums["loss"] += float(loss)
+        if nl:
+            self.n["lesion"] += nl
+            self.sums["lesion_loss"] += float(per_box[lesion].sum())
+            self.sums["lesion_dice"] += float(dice[lesion].sum())
+            self.sums["lesion_nonempty"] += float(nonempty[lesion].sum())
+        if ne:
+            self.n["empty"] += ne
+            self.sums["empty_loss"] += float(per_box[~lesion].sum())
+            self.sums["empty_nonempty"] += float(nonempty[~lesion].sum())
+
+    def result(self) -> dict:
+        nan = float("nan")
+        out = {"loss": self.sums["loss"] / max(self.n["steps"], 1)}
+        for k in ("lesion_loss", "lesion_dice", "lesion_nonempty"):
+            out[k] = self.sums[k] / self.n["lesion"] if self.n["lesion"] else nan
+        for k in ("empty_loss", "empty_nonempty"):
+            out[k] = self.sums[k] / self.n["empty"] if self.n["empty"] else nan
+        out.update(n_lesion_boxes=self.n["lesion"], n_empty_boxes=self.n["empty"])
+        if len(self.kind) > 1:  # E2c: brain box and tiles separately
+            out["by_kind"] = {k: {"n_lesion_boxes": n, "lesion_loss": l / n, "lesion_nonempty": e / n}
+                              for k, (n, l, e) in sorted(self.kind.items())}
+        return out
+
+
+def collapse_verdict(start: dict, check: dict, cc: dict) -> dict:
+    """Training-only collapse check (models.medsam.finetune.collapse_check). passed=False -> stop the fold.
+
+    Both criteria are applied to all lesion boxes together and, for E2c, to the brain box and the tiles
+    separately (box kinds with at least min_boxes_per_kind lesion boxes in both windows): pooled numbers
+    can hide collapsed tiles behind an over-segmenting brain box (first E2c run).
+    """
+    groups = [("lesion boxes", start, check)]
+    for k, c in check.get("by_kind", {}).items():
+        s = start.get("by_kind", {}).get(k)
+        mn = int(cc.get("min_boxes_per_kind", 30))
+        if s and s["n_lesion_boxes"] >= mn and c["n_lesion_boxes"] >= mn:
+            groups.append((f"{k} lesion boxes", s, c))
+    reasons, ratios = [], {}
+    for name, s, c in groups:
+        ratio = c["lesion_loss"] / s["lesion_loss"]
+        ratios[name] = ratio
+        if not ratio <= float(cc["max_lesion_loss_ratio"]):
+            reasons.append(f"{name}: loss {c['lesion_loss']:.4f} is {ratio:.2f} x its start value "
+                           f"{s['lesion_loss']:.4f} (needs <= {cc['max_lesion_loss_ratio']})")
+        if not c["lesion_nonempty"] >= float(cc["min_lesion_nonempty"]):
+            reasons.append(f"{name}: only {c['lesion_nonempty']:.3f} get a non-empty prediction "
+                           f"(needs >= {cc['min_lesion_nonempty']})")
+    return {"passed": not reasons, "reasons": reasons, "lesion_loss_ratio": ratios["lesion boxes"],
+            "lesion_loss_ratios": ratios, "start": start, "check": check, "criteria": cc}
+
+
 def train(cases: list[CaseData], condition: str, cfg: dict, run_dir: Path, seed: int,
-          steps: int | None = None, log=print, num_workers: int = 8) -> dict:
+          steps: int | None = None, log=print, num_workers: int = 8, dice_on: str | None = None) -> dict:
+    """Train (or resume). Returns {"steps", "seconds", "s_per_step", "collapse_check", "collapsed"}.
+
+    If the collapse check fails at collapse_check.at_step, training stops there (no checkpoint_final.pt)
+    and collapsed=True. Per-window statistics go to <run_dir>/train_log.jsonl and the check result to
+    <run_dir>/collapse_check.json.
+    """
     ft = cfg["models"]["medsam"]["finetune"]
     steps = int(steps or ft["steps"])
     bs = int(ft["batch_size"])
+    dice_on = dice_on or ft["dice_on"]
+    cc = ft["collapse_check"]
+    at_step, win, every = int(cc["at_step"]), int(cc["window"]), int(cc["repeat_every"])
     torch.manual_seed(seed)
     model = load_medsam(cfg)
     model.image_encoder = None  # embeddings are cached; frees ~360 MB of GPU memory
@@ -179,44 +306,85 @@ def train(cases: list[CaseData], condition: str, cfg: dict, run_dir: Path, seed:
     opt = torch.optim.AdamW(params, lr=float(ft["lr"]), weight_decay=float(ft["weight_decay"]))
     warm = int(ft["warmup_steps"])
     sched = torch.optim.lr_scheduler.LambdaLR(opt, lambda s: min(1.0, (s + 1) / warm))
-    dice_loss = DiceLoss(sigmoid=True, squared_pred=True, reduction="mean")
-    bce = torch.nn.BCEWithLogitsLoss()
+    dice_fn = DiceLoss(sigmoid=True, squared_pred=True, reduction="none")
 
-    start = 0
+    start, start_stats = 0, None
     latest = run_dir / "checkpoint_latest.pt"
     if latest.exists():
         ck = torch.load(latest, map_location="cpu", weights_only=False)
         load_trainable(model, ck["model"]), opt.load_state_dict(ck["opt"]), sched.load_state_dict(ck["sched"])
-        start = int(ck["step"])
+        start, start_stats = int(ck["step"]), ck.get("start_stats")
         log(f"resumed from step {start}")
     model.prompt_encoder.train(), model.mask_decoder.train()
+    log(f"loss: Dice on {dice_on} + BCE on every box; collapse check at step {at_step} "
+        f"(window {win}, lesion-loss ratio <= {cc['max_lesion_loss_ratio']}, "
+        f"lesion non-empty >= {cc['min_lesion_nonempty']})")
 
     loader = torch.utils.data.DataLoader(SampleStream((cases, condition, cfg, seed + start), (steps - start) * bs),
                                          batch_size=bs, num_workers=num_workers, pin_memory=True,
                                          persistent_workers=False, prefetch_factor=4 if num_workers else None)
-    t0, run_loss, step = time.time(), 0.0, start
-    for emb, box, tgt in loader:
-        emb, box = emb.cuda(non_blocking=True), box.cuda(non_blocking=True)
-        tgt = tgt.cuda(non_blocking=True)[:, None].float()
-        with torch.autocast("cuda", dtype=torch.bfloat16):
-            low = decode(model, emb, box)
-        logits = F.interpolate(low.float(), size=(SIDE, SIDE), mode="bilinear", align_corners=False)
-        loss = dice_loss(logits, tgt) + bce(logits, tgt)
-        opt.zero_grad(set_to_none=True)
-        loss.backward()
-        opt.step(), sched.step()
-        step += 1
-        run_loss += loss.item()
-        if step % 100 == 0 or step == steps:
-            el = time.time() - t0
-            log(f"step {step}/{steps} loss {run_loss / 100:.4f} lr {sched.get_last_lr()[0]:.2e} "
-                f"{el / (step - start):.3f} s/step")
-            run_loss = 0.0
-        if step % 1000 == 0 or step == steps:
-            torch.save({"model": trainable_state(model), "opt": opt.state_dict(), "sched": sched.state_dict(),
-                        "step": step}, latest)
-    torch.save(trainable_state(model), run_dir / "checkpoint_final.pt")
-    return {"steps": steps, "seconds": time.time() - t0, "s_per_step": (time.time() - t0) / max(step - start, 1)}
+    t0, step = time.time(), start
+    win_stats = WindowStats()
+    verdict = None
+    cf = run_dir / "collapse_check.json"
+    history = json.loads(cf.read_text()).get("history", []) if cf.exists() else []
+    jl = (run_dir / "train_log.jsonl").open("a")
+    try:
+        for emb, box, tgt, kind in loader:
+            emb, box = emb.cuda(non_blocking=True), box.cuda(non_blocking=True)
+            tgt = tgt.cuda(non_blocking=True)[:, None].float()
+            with torch.autocast("cuda", dtype=torch.bfloat16):
+                low = decode(model, emb, box)
+            logits = F.interpolate(low.float(), size=(SIDE, SIDE), mode="bilinear", align_corners=False)
+            dice, bce, lesion = box_loss_terms(logits, tgt, dice_fn)
+            loss = combine_loss(dice, bce, lesion, dice_on)
+            opt.zero_grad(set_to_none=True)
+            loss.backward()
+            opt.step(), sched.step()
+            step += 1
+            with torch.no_grad():
+                win_stats.add(loss.detach(), dice.detach(), bce.detach(), lesion,
+                              box_nonempty(logits.detach(), box), dice_on, kind.to(lesion.device))
+            if step % win == 0 or step == steps:
+                r = win_stats.result()
+                win_stats = WindowStats()
+                if step == win and start == 0:
+                    start_stats = r
+                jl.write(json.dumps({"step": step, **r, "lr": sched.get_last_lr()[0]}) + "\n")
+                jl.flush()
+                log(f"step {step}/{steps} loss {r['loss']:.4f} | lesion boxes: loss {r['lesion_loss']:.4f} "
+                    f"(dice {r['lesion_dice']:.4f}) non-empty {r['lesion_nonempty']:.3f} | empty boxes: loss "
+                    f"{r['empty_loss']:.4f} non-empty {r['empty_nonempty']:.3f} | lr {sched.get_last_lr()[0]:.2e} "
+                    f"{(time.time() - t0) / (step - start):.3f} s/step"
+                    + "".join(f" | {k} lesion boxes: loss {v['lesion_loss']:.4f} non-empty {v['lesion_nonempty']:.3f}"
+                              for k, v in r.get("by_kind", {}).items()))
+                due = step >= at_step and ((step - at_step) % every == 0 or step == steps)
+                if due and start_stats is not None:
+                    verdict = collapse_verdict(start_stats, r, cc)
+                    verdict.update(step=step, dice_on=dice_on, condition=condition)
+                    history.append({"step": step, "passed": verdict["passed"], "reasons": verdict["reasons"],
+                                    "lesion_loss_ratios": verdict["lesion_loss_ratios"],
+                                    "lesion_nonempty": r["lesion_nonempty"],
+                                    **({"by_kind_nonempty": {k: v["lesion_nonempty"] for k, v in r["by_kind"].items()}}
+                                       if "by_kind" in r else {})})
+                    verdict["history"] = history
+                    (run_dir / "collapse_check.json").write_text(json.dumps(verdict, indent=2))
+                    log(f"collapse check at step {step}: {'PASSED' if verdict['passed'] else 'FAILED'} "
+                        f"(lesion-loss ratios {', '.join(f'{k} {v:.3f}' for k, v in verdict['lesion_loss_ratios'].items())}"
+                        f"; lesion non-empty {r['lesion_nonempty']:.3f})"
+                        + "".join(f"\n    {x}" for x in verdict["reasons"]))
+            if step % 1000 == 0 or step == steps or (verdict is not None and not verdict["passed"]):
+                torch.save({"model": trainable_state(model), "opt": opt.state_dict(), "sched": sched.state_dict(),
+                            "step": step, "start_stats": start_stats}, latest)
+            if verdict is not None and not verdict["passed"]:
+                break
+    finally:
+        jl.close()
+    collapsed = verdict is not None and not verdict["passed"]
+    if not collapsed:
+        torch.save(trainable_state(model), run_dir / "checkpoint_final.pt")
+    return {"steps": step, "seconds": time.time() - t0, "s_per_step": (time.time() - t0) / max(step - start, 1),
+            "collapse_check": verdict, "collapsed": collapsed}
 
 
 # ---------------------------------------------------------------- inference
