@@ -1,0 +1,16 @@
+fold,case_id,scanner,dice,lesion_f1,fp_lesions
+2,msseg_train_c01_p01,siemens_verio_3t,0.00343046,0.0,4
+4,msseg_train_c01_p02,siemens_verio_3t,0.0447045,0.0,28
+3,msseg_train_c01_p03,siemens_verio_3t,0.5858,0.144928,32
+1,msseg_train_c01_p04,siemens_verio_3t,0.0,0.0,0
+0,msseg_train_c01_p05,siemens_verio_3t,0.639171,0.148673,151
+3,msseg_train_c07_p01,siemens_aera_1p5t,0.201826,0.16,21
+2,msseg_train_c07_p02,siemens_aera_1p5t,0.00129738,0.0,3
+0,msseg_train_c07_p03,siemens_aera_1p5t,0.189468,0.0717131,224
+4,msseg_train_c07_p04,siemens_aera_1p5t,0.0413755,0.0769231,2
+1,msseg_train_c07_p05,siemens_aera_1p5t,0.00087222,0.0,1
+0,msseg_train_c08_p01,philips_ingenia_3t,0.490191,0.221316,145
+4,msseg_train_c08_p02,philips_ingenia_3t,0.0,0.0,0
+2,msseg_train_c08_p03,philips_ingenia_3t,0.000165172,0.0,1
+3,msseg_train_c08_p04,philips_ingenia_3t,0.346735,0.178344,14
+1,msseg_train_c08_p05,philips_ingenia_3t,0.000615168,0.0,1

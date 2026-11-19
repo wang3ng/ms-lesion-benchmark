@@ -1,4 +1,4 @@
-"""Compare E1 (nnU-Net), E2a (MedSAM + oracle boxes) and E2c (MedSAM + brain box/tiles) on the CV folds.
+"""Compare E1 (nnU-Net) with MedSAM E2a (oracle boxes), E2b (boxes from E1) and E2c (brain box/tiles) on the CV folds.
 
     source scripts/env.sh
     python scripts/e2_summary.py        # -> results/E2/cv_summary.md (+ figures/, tables/)
@@ -8,7 +8,9 @@ model that did not train on them (E1's 5 patient-level folds), with the same
 Anima-port lesion rule (results/<exp>/fold<k>_cases.csv from scripts/evaluate.py).
 Works on partial results: only patients evaluated by every model are compared.
 Also applies the E8 decision rule (configs/experiment.yaml experiments.E8) to the
-pooled <20 mm^3 recalls. Reads training cases only; no test case.
+pooled <20 mm^3 recalls. E2b is included when its results exist. The first,
+collapsed E2c run (results/E2c_run1, <medsam_runs>/E2c_run1) is reported in an
+appendix. Reads training cases only; no test case.
 """
 
 from __future__ import annotations
@@ -35,10 +37,38 @@ from msbench.reporting import (
 )
 from msbench.stats import paired_bootstrap_diff_ci, paired_bootstrap_ratio_diff_ci, paired_wilcoxon
 
-MODELS = ["E1", "E2a", "E2c"]
-MODEL_LABELS = {"E1": "E1 nnU-Net", "E2a": "E2a MedSAM + oracle boxes", "E2c": "E2c MedSAM + brain box/tiles"}
-MODEL_COLORS = {"E1": "#2a78d6", "E2a": "#eb6834", "E2c": "#1baf7a"}  # fixed per model, palette order
-COMPARISONS = [("E2c", "E1"), ("E2a", "E2c")]
+MODELS = ["E1", "E2a", "E2b", "E2c"]
+REQUIRED = ["E1", "E2a", "E2c"]       # E2b is optional (gated on E2c passing the collapse check)
+RUN1 = "E2c_run1"                     # first E2c run, collapsed; appendix only
+MODEL_LABELS = {"E1": "E1 nnU-Net", "E2a": "E2a MedSAM + oracle boxes", "E2b": "E2b MedSAM + E1 boxes",
+                "E2c": "E2c MedSAM + brain box/tiles", RUN1: "E2c run 1 (collapsed)"}
+# fixed per model in palette order (E2b got the 4th hue when it was added)
+MODEL_COLORS = {"E1": "#2a78d6", "E2a": "#eb6834", "E2c": "#1baf7a", "E2b": "#eda100"}
+COMPARISONS = [("E2c", "E1"), ("E2a", "E2c"), ("E2b", "E1")]
+
+
+def collapse_rows(exp: str, cfg: dict) -> list[dict]:
+    """Collapse-check summary per fold from <medsam_runs>/<exp>/fold_k/collapse_check.json."""
+    rows = []
+    for k in range(5):
+        f = paths(cfg)["medsam_runs"] / exp / f"fold_{k}" / "collapse_check.json"
+        if not f.exists():
+            continue
+        v = json.loads(f.read_text())
+        h = v.get("history", [])
+        first = h[0] if h else {}
+        row = {"model": exp, "fold": k, "checks": len(h), "last step": v.get("step"),
+               "result": "passed" if v["passed"] else "FAILED",
+               "start lesion loss": v["start"]["lesion_loss"],
+               "lesion loss ratio @3000": first.get("lesion_loss_ratios", {}).get("lesion boxes", np.nan),
+               "lesion loss ratio @end": v["lesion_loss_ratio"],
+               "non-empty @3000": first.get("lesion_nonempty", np.nan),
+               "non-empty @end": v["check"]["lesion_nonempty"]}
+        for kd, x in v["check"].get("by_kind", {}).items():
+            row[f"{kd} non-empty @end"] = x["lesion_nonempty"]
+        row["empty-box non-empty @end"] = v["check"].get("empty_nonempty", np.nan)
+        rows.append(row)
+    return rows
 
 
 def pred_dir(exp: str, fold: int, cfg: dict) -> Path:
@@ -204,33 +234,38 @@ def main(argv=None) -> int:
     alive = job_alive(Path(os.environ.get("MSBENCH_LOGS", paths(cfg)["logs"])) / "E2", marker="run_E2")
 
     data, folds = {}, {}
-    for exp in MODELS:
+    for exp in MODELS + [RUN1]:
         df, fl = load_model(exp, splits, args.results_dir)
         if df is not None:
             data[exp], folds[exp] = mask_empty_bins(df, names), fl
+    run1 = data.pop(RUN1, None)
     md: list[str] = []
     add = md.append
-    add("# E2 cross-validation comparison — E1 nnU-Net vs MedSAM (E2a oracle boxes, E2c brain box + tiles)\n")
+    add("# E2 cross-validation comparison — E1 nnU-Net vs MedSAM (E2a oracle boxes, E2b E1 boxes, E2c brain box + tiles)\n")
     add(f"Generated {dt.datetime.now():%Y-%m-%d %H:%M} from commit `{commit}` by `scripts/e2_summary.py`.\n")
     status = pd.DataFrame([{"model": MODEL_LABELS[e], "folds evaluated": ", ".join(map(str, folds.get(e, []))) or "–",
                             "patients": len(data[e]) if e in data else 0} for e in MODELS])
     exps = [e for e in MODELS if e in data]
     common = sorted(set.intersection(*[set(data[e].case_id) for e in exps])) if exps else []
-    if len(exps) < len(MODELS) or len(common) < 15:
+    if not set(REQUIRED) <= set(exps) or len(common) < 15:
         add(f"> **PARTIAL RESULT: {len(common)} patients evaluated by all of {', '.join(exps) or '–'}** "
             f"(E2 job {'running' if alive else 'not running'}). Numbers will change.\n")
     else:
-        add("> **Complete: all 15 MSSEG training patients, each scored by the fold model that did not train on "
-            "them, for all three models.**\n")
-    if args.note:
-        add(args.note.read_text().strip() + "\n")
+        add(f"> **Complete: all 15 MSSEG training patients, each scored by the fold model that did not train on "
+            f"them, for {', '.join(exps)}.**\n")
     ft = cfg["models"]["medsam"]["finetune"]
     add(f"Same patient-level folds for all models (E1's `splits_final.json`). Lesion rule: Anima-port "
         f"({rule['connectivity']}-connected, > {rule['min_lesion_mm3']} mm³, α {rule['alpha']} / β {rule['beta']} / "
         f"γ {rule['gamma']}); reference = MSSEG consensus. MedSAM: frozen image encoder, prompt encoder + mask "
         f"decoder fine-tuned per condition and fold ({ft['steps']} steps × {ft['batch_size']}, same box type at "
         "training and validation). **E2a uses the reference to place its boxes and is an upper bound on tracing, "
-        "not a fair comparison; E2c is the fair head-to-head with E1.** No test case is used.\n")
+        "not a fair comparison; E2c is the fair head-to-head with E1. E2b refines E1's detections (boxes from E1 "
+        "out-of-fold predictions), so its lesion recall is bounded by E1's.** No test case is used.\n")
+    add(f"Loss: per-box soft Dice on boxes containing lesion voxels + BCE on every box (`dice_on: {ft['dice_on']}`). "
+        "**Post-hoc correction:** the first E2c run used Dice on every box and collapsed on the training folds; "
+        "the loss was changed after that run, from training-fold behaviour only, with no test data involved "
+        "(appendix). E2a's loss is identical under both settings (all its boxes contain lesion voxels) and was "
+        "not rerun.\n")
     add(md_table(status, index=False))
     add("")
     if len(exps) < 2 or not common:
@@ -399,13 +434,37 @@ def main(argv=None) -> int:
             f"(paired cluster bootstrap 95% CI {fmt_interval(d['low'], d['high'])}; the rule uses the point estimate)\n")
         for i, line in enumerate(lines, 1):
             add(f"{i}. {line}")
-        partial = len(common) < 15 or len(exps) < 3
+        partial = len(common) < 15 or not set(REQUIRED) <= set(exps)
         add(f"\n**Selected fix: `{choice}`**" + (" (provisional: partial results)" if partial else "") + "\n")
         (tables / "e8_decision.json").write_text(json.dumps({"recall_lt20": recall, "diff": recall["E2a"] - recall["E2c"],
                                                              "diff_ci": [d["low"], d["high"]], "choice": choice,
                                                              "patients": len(common), "partial": partial}, indent=2))
     else:
         add("_Needs both E2a and E2c._\n")
+
+    # ---- collapse check
+    crow = [r for e in ("E2c", "E2b") for r in collapse_rows(e, cfg)]
+    add("## Collapse check (training data only)\n")
+    cc = ft["collapse_check"]
+    add(f"Logged on the training batches of each fold: lesion-box loss vs its value over steps 1–{cc['window']}, "
+        f"and the share of lesion boxes with a non-empty prediction (any logit > 0 inside the box). Checked at "
+        f"step {cc['at_step']} and every {cc['repeat_every']} steps after; a fold stops if the ratio is > "
+        f"{cc['max_lesion_loss_ratio']} or the share is < {cc['min_lesion_nonempty']} (pooled, and for E2c also "
+        "for the brain box and the tiles separately). E2a was trained before the check existed.\n")
+    if crow:
+        ct = pd.DataFrame(crow)
+        ct.to_csv(tables / "collapse_check.csv", index=False)
+        add(md_table(ct, index=False))
+    else:
+        add("_No collapse-check results yet._")
+    add("")
+    for e in ("E2c", "E2b"):
+        f = tables / f"box_diagnostics_{e}.csv"
+        if f.exists():
+            add(f"Box diagnostics, {MODEL_LABELS[e]} (final checkpoint, 4 training patients per fold, "
+                "`scripts/medsam_box_diagnostics.py`):\n")
+            add(md_table(pd.read_csv(f), index=False))
+            add("")
 
     # ---- per patient
     add("## Per-patient results\n")
@@ -415,6 +474,43 @@ def main(argv=None) -> int:
             pc[f"{m} {e}"] = cases[e][m].to_numpy()
     add(md_table(pc, index=False))
     pc.to_csv(tables / "cases.csv", index=False)
+
+    # ---- appendix: first E2c run
+    add("\n## Appendix — first E2c run (collapsed; documented failure)\n")
+    if args.note:
+        add(args.note.read_text().strip() + "\n")
+    if run1 is not None and set(common) <= set(run1.case_id) and "E2c" in cases:
+        r1 = run1[run1.case_id.isin(common)].sort_values("case_id").reset_index(drop=True)
+        st1 = patient_stats(r1, metric_cols, ci_kw).set_index("metric")
+        rec1 = pooled_bin_recall(r1, names, ci_kw)
+        rows = []
+        for m in MAIN_METRICS:
+            rows.append({"metric": m, MODEL_LABELS[RUN1]: cell(st1, m), MODEL_LABELS["E2c"]: cell(stats["E2c"], m)})
+        for bname in names:
+            a1 = rec1[(rec1.scanner == "all") & (rec1.bin_mm3 == bname)].iloc[0]
+            a2 = rec["E2c"][(rec["E2c"].scanner == "all") & (rec["E2c"].bin_mm3 == bname)].iloc[0]
+            rows.append({"metric": f"pooled recall {bname}",
+                         MODEL_LABELS[RUN1]: f"{a1.detected}/{a1.reference_lesions} = {a1.recall:.3f}",
+                         MODEL_LABELS["E2c"]: f"{a2.detected}/{a2.reference_lesions} = {a2.recall:.3f}"})
+        add(f"Same {len(common)} patients; first run (Dice on every box) vs the corrected rerun.\n")
+        add(md_table(pd.DataFrame(rows), index=False))
+        r20 = rec1[(rec1.scanner == "all") & (rec1.bin_mm3 == names[0])].iloc[0]
+        e2a20 = rec["E2a"][(rec["E2a"].scanner == "all") & (rec["E2a"].bin_mm3 == names[0])].iloc[0]
+        ch1, _ = e8_decision(dr["rules"], {"E2a": float(e2a20.recall), "E2c": float(r20.recall)})
+        add(f"\nE8 rule on the first run (superseded): {e2a20.recall:.4f} − {r20.recall:.4f} = "
+            f"{e2a20.recall - r20.recall:.4f} → `{ch1}`.\n")
+        st1.assign(model=RUN1).to_csv(tables / "e2c_run1_metrics.csv")
+        rec1.to_csv(tables / "e2c_run1_recall_by_size_bin.csv", index=False)
+        pc1 = r1[["fold", "case_id", "scanner", "dice", "lesion_f1", "fp_lesions"]]
+        pc1.to_csv(tables / "e2c_run1_cases.csv", index=False)
+        f = tables / f"box_diagnostics_{RUN1}.csv"
+        if f.exists():
+            add("Box diagnostics of the first run (final checkpoint, 4 training patients per fold, "
+                "`scripts/medsam_box_diagnostics.py`):\n")
+            add(md_table(pd.read_csv(f), index=False))
+            add("")
+    else:
+        add("_First-run results not found (results/E2c_run1)._\n")
 
     (out / "cv_summary.md").write_text("\n".join(md) + "\n")
     print(f"wrote {out / 'cv_summary.md'} ({len(common)} common patients; models {exps})")

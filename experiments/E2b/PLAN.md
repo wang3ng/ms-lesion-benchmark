@@ -1,4 +1,4 @@
-# E2b — MedSAM with boxes from E1 detections (plan, not run)
+# E2b — MedSAM with boxes from E1 detections (plan; run 2026-11-19, results in `results/E2/cv_summary.md`)
 
 Question: given nnU-Net's detections as prompts, does MedSAM trace lesions better than nnU-Net, and
 does it drop some of nnU-Net's false positives? E2b cannot find lesions that E1 missed (no box), so
@@ -28,8 +28,9 @@ detected lesions) and precision.
 ## Training and inference
 
 Identical to E2a/E2c (`models.medsam.finetune`, `.inference`): prompt encoder + mask decoder only,
-4000 steps × 16, AdamW 1e-4, Dice + BCE on the consensus restricted to the box, 50% boxes with lesion
-voxels per batch (E1 false-positive components give the empty boxes), last checkpoint, mean
+10,000 steps × 16, AdamW 1e-4, BCE on every box + per-box Dice on boxes containing lesion voxels
+(`finetune.dice_on: lesion_boxes`, the post-hoc correction after the first E2c run) against the consensus
+restricted to the box, 50% boxes with lesion voxels per batch, training-only collapse check (E1 false-positive components give the empty boxes), last checkpoint, mean
 probability over covering boxes > 0.5. Same 5 folds as E1.
 
 ## Evaluation
@@ -39,10 +40,10 @@ rule), then pooled CV like `scripts/e1_summary.py`. Extra analyses: (1) paired W
 patient (Dice, precision, F1); (2) Dice per detected lesion, E2b vs E1, by size bin; (3) share of
 E1 false positives that E2b turns into empty masks.
 
-## Run (after OK)
+## Run (gated: starts only if every E2c fold passed the collapse check)
 
 ```bash
-scripts/run_E2.sh --exps E2b --dry-run
-scripts/run_E2.sh --exps E2b
+scripts/run_E2.sh --exps "E2c E2b" --dry-run
+scripts/run_E2.sh --exps "E2c E2b"
 ```
 Estimated GPU time: similar to E2a (see the E2a/E2c benchmark in `experiments/E2/README.md`).

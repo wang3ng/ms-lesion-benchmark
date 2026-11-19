@@ -1,0 +1,6 @@
+model,fold,training patients,box lesion boxes non-empty,lesion-free boxes non-empty,voxel recall (mean_all),FP voxels / patient (mean_all)
+E2b,0,4,0.9984,0.9472,0.8043,14989.5000
+E2b,1,4,0.9988,0.9288,0.7897,15135.0000
+E2b,2,4,0.9975,0.9115,0.7758,10555.5000
+E2b,3,4,0.9986,0.9368,0.7773,11843.7500
+E2b,4,4,0.9977,0.9177,0.7897,10999.7500
