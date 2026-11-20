@@ -22,6 +22,7 @@ paths:
   e7_runs: ../e7_runs
   sam_vit_b: ../models/e7_downloads/sam_vit_b_01ec64.pth        # Meta SAM ViT-B; md5 01ec64d2..., sha256 ec2df627...
   hardnet85: ../models/e7_downloads/hardnet85-a28faa00.pth      # HarDNet-85 ImageNet (ping-chao.com); sha256 a28faa00...
+  e9_runs: ../e9_runs                                   # E9 (exploratory) MedSAM / HarDNet runs
 
 primary_dataset: msseg2016
 development_dataset: mslesseg   # for debugging pipelines only; not in final tables
@@ -121,6 +122,22 @@ e7:
     cache_rate: 1.0                   # all training scans cached in RAM (their default 0.7); speed only
     logging: "wandb/TensorBoard replaced by no-op stand-ins; slice-image logging off"
     environment: "Python 3.12, torch 2.11, MONAI 1.6.1 (paper: Python 3.8, torch 1.13, MONAI 1.3)"
+
+# E9 — EXPLORATORY, added after the results freeze (branch e9-data-scaling): data scaling. One model per
+# method trained on MSSEG training (15) + MSLesSeg training (non-GE, known scanners), no cross-validation,
+# scored on the frozen test sets. MSLesSeg labels follow a different annotation protocol. Approved 2026-11-20.
+e9:
+  training_set:
+    msseg2016: train                          # 15 scans, Siemens Verio / Aera, Philips Ingenia 3T
+    mslesseg: {split: train, exclude_scanner_prefix: [ge_], exclude_scanner: [unknown]}   # per scan
+  # Each method follows its own standard recipe: MedSAM and HarDNet budgets are scaled to keep the same
+  # updates per training scan as their 12-scan CV folds; nnU-Net keeps its standard 1000 epochs x 250
+  # iterations (fewer updates per scan than E1).
+  nnunet: {dataset_id: 502, dataset_name: Dataset502_MSSEG_MSLesSeg, configuration: 3d_fullres, planning: automatic,
+           trainer: nnUNetTrainer, epochs: 1000, fold: all}
+  medsam_e2c: {steps_per_training_scan: 833.33, reference_steps: 10000, reference_scans: 12}   # 10,000 x n/12
+  hardnet: {epochs: 300, repeats_per_epoch: 8}                                              # updates scale with n
+  comparisons: [[E9_nnunet, E1], [E9_E2c, E2c], [E9_hardnet, E7_hardnet]]                   # frozen = 5-fold ensembles
 
 # Exploratory analyses decided after results were seen; reported separately and labelled as such.
 analysis:

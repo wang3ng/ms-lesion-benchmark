@@ -44,24 +44,34 @@ def main(argv=None) -> int:
     ap.add_argument("--phase", type=int, choices=[1, 2])
     ap.add_argument("--fold", type=int, required=True)
     ap.add_argument("--epochs", type=int, help="override (smoke tests only; the run gets a _smoke name)")
+    ap.add_argument("--dataset", choices=["cv", "e9"], default="cv",
+                    help="e9: HarDNet baseline on the E9 combined set (fold0 = all scans, no validation)")
     args = ap.parse_args(argv)
     if args.model == "samless" and args.phase is None:
         ap.error("--phase is required for samless")
+    if args.dataset == "e9" and (args.model != "hardnet" or args.fold != 0):
+        ap.error("--dataset e9 is for --model hardnet --fold 0 only")
     cfg = load_config()
     e7, p = cfg["e7"], paths(cfg)
-    root = p["e7_runs"]
+    root = p["e9_runs"] if args.dataset == "e9" else p["e7_runs"]
     (root / "cp").mkdir(parents=True, exist_ok=True)
     link = root / "cp" / "sam_vit_b.pth"
     if not link.exists():
         link.symlink_to(p["sam_vit_b"])
-    split = root / "splits" / "e7_split.json"
-    build_split(cfg, split)
+    if args.dataset == "e9":
+        from msbench.e9 import hardnet_split
+        split = hardnet_split(cfg, root / "splits" / "e9_split.json")
+    else:
+        split = root / "splits" / "e7_split.json"
+        build_split(cfg, split)
 
     part = e7["phase1"] if args.model == "samless" and args.phase == 1 else \
         e7["phase2"] if args.model == "samless" else e7["hardnet_baseline"]
     smoke = args.epochs is not None
-    epochs = args.epochs or int(part["epochs"])
+    epochs = args.epochs or int(cfg["e9"]["hardnet"]["epochs"] if args.dataset == "e9" else part["epochs"])
     name = run_name(args.model, args.phase, args.fold, smoke)
+    if args.dataset == "e9":
+        name = name.replace("_fold0", "_e9")
     done = final_ckpt(root, name, epochs)
     if done:
         print(f"already trained: {done}")

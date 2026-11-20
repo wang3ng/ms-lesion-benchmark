@@ -34,11 +34,20 @@ SETS = {
     "msseg2016_test": lambda ix: ix[(ix.dataset == "msseg2016") & (ix.release_split == "test")],
     "isbi2015": lambda ix: ix[ix.dataset == "isbi2015"],
 }
+DEFAULT_SETS = list(SETS)
+# E9 (exploratory, after the freeze): MSLesSeg training scans kept for the combined set (not in the default)
+SETS["mslesseg_e9"] = lambda ix: ix[ix.case_id.isin(_e9_mslesseg_ids())]
+
+
+def _e9_mslesseg_ids() -> set:
+    from msbench.e9 import training_cases
+    tr = training_cases(load_config())
+    return set(tr[tr.dataset == "mslesseg"].case_id)
 
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--sets", nargs="+", default=list(SETS), choices=list(SETS))
+    ap.add_argument("--sets", nargs="+", default=DEFAULT_SETS, choices=list(SETS))
     ap.add_argument("--cases", nargs="+", help="only these case ids")
     ap.add_argument("--batch", type=int, default=8)
     ap.add_argument("--dry-run", action="store_true", help="list work, encode nothing")
