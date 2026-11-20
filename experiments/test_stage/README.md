@@ -29,3 +29,7 @@ Checks (no scoring): every prediction is on the FLAIR grid of its case (shape an
 - Same Anima-port lesion rule, size bins and statistics as the cross-validation.
 - ISBI: 21 scans of 5 patients — bootstrap CIs resample patients, paired Wilcoxon on per-patient means (n = 5).
 - `msseg_test_c07_p08` (empty consensus): reported by its false-positive lesions, left out of averages and tests.
+
+## Added after the freeze (tag `results-frozen-v2`)
+
+Segmentation-quality metrics on the same frozen predictions (lesion-wise Dice, per-lesion HD95/ASD, whole-mask HD95, whole-mask IoU): `scripts/seg_quality.py`, appended as a separate section to `results/E2/cv_summary.md` and `results/test/summary.md`. Nothing in the `results-frozen` tables changed.

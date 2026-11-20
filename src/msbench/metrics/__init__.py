@@ -17,6 +17,13 @@ from .detection import (
     lesion_volume_histogram,
 )
 from .overlap import dice, lesion_count, lesion_volume_ml
+from .segquality import (
+    average_surface_distance,
+    hd95,
+    iou,
+    lesion_segmentation_quality,
+    segmentation_quality,
+)
 
 __all__ = [
     "DEFAULT_ALPHA",
@@ -25,16 +32,21 @@ __all__ = [
     "DEFAULT_GAMMA",
     "DEFAULT_MIN_LESION_MM3",
     "DetectionResult",
+    "average_surface_distance",
     "bin_names",
     "dice",
     "evaluate_case",
+    "hd95",
+    "iou",
     "label_lesions",
     "lesion_count",
     "lesion_detection",
     "lesion_detection_by_size",
     "lesion_records",
+    "lesion_segmentation_quality",
     "lesion_volume_histogram",
     "lesion_volume_ml",
+    "segmentation_quality",
 ]
 
 

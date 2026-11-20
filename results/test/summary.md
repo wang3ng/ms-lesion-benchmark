@@ -607,3 +607,293 @@ Bias with its 95% CI (patient bootstrap); limits of agreement = bias ± 1.96 SD 
 | pooled recall 20-100 | 21 | 5 | 0.274 | 0.177 | 0.097 | [0.028, 0.191] | – | – |
 | pooled recall >=100 | 21 | 5 | 0.451 | 0.268 | 0.183 | [0.122, 0.270] | – | – |
 
+<!-- segq:start -->
+## Segmentation-quality metrics (added after the results freeze)
+
+> **Added after the results freeze, on the frozen predictions.** No model, prediction, threshold or number above this section was changed. Same lesions, matching rule (Anima port), size bins, patients and statistical handling as above.
+
+Definitions (`msbench.metrics.segquality`): for each **detected** reference lesion, its prediction is the union of the predicted components overlapping it. **Lesion-wise Dice** = Dice of that pair; **lesion HD95** = max of the two directed 95th-percentile surface distances (mm); **lesion ASD** = symmetric mean surface distance (mm). Each is averaged over the detected lesions of a scan (overall and by the reference lesion's size bin), then over scans. Missed lesions have no value: these metrics describe tracing quality *given* detection, so a model that detects more (often harder, smaller) lesions is compared on a different lesion set; rows marked ‡ restrict each pair of models to the lesions both detected (unadjusted p). **† Whole-mask HD95** uses the raw masks: one distant false positive can dominate it, so it mostly reflects stray false positives rather than outline quality. Test sets as above; ISBI resampled and tested by patient (5 patients, smallest possible Wilcoxon p = 0.0625); E2a on ISBI uses the boxes of the rater it is scored against.
+
+Paired comparisons: per-scan values, A − B, paired patient-bootstrap 95% CI, Wilcoxon signed-rank; **Holm adjustment within each comparison over lesion-wise Dice (overall and the three size bins) and lesion HD95**; scans where either model has no detected lesion (in the bin) are dropped pairwise.
+
+### MSSEG in-dist.
+
+Empty reference, reported separately and left out of the averages and tests: msseg_test_c07_p08 — lesion-wise metrics undefined (no reference lesion); whole-mask IoU per model (1 = both empty):
+
+| scan | model | whole-mask IoU | whole-mask HD95 |
+|---|---|---|---|
+| msseg_test_c07_p08 | E1 nnU-Net | 1.000 | undefined (empty reference) |
+| msseg_test_c07_p08 | E2a MedSAM + GT boxes | 1.000 | undefined (empty reference) |
+| msseg_test_c07_p08 | E2b MedSAM + E1 boxes | 1.000 | undefined (empty reference) |
+| msseg_test_c07_p08 | E2c MedSAM + brain box/tiles | 0.000 | undefined (empty reference) |
+| msseg_test_c07_p08 | E8 MedSAM + zoomed tiles | 0.000 | undefined (empty reference) |
+
+29 scans, 29 patients. Mean ± SD over scans of the per-scan values, 95% CI (patient bootstrap); (n=…) = scans with at least one detected lesion (in the bin).
+
+| metric | E1 nnU-Net | E2a MedSAM + GT boxes | E2b MedSAM + E1 boxes | E2c MedSAM + brain box/tiles | E8 MedSAM + zoomed tiles |
+|---|---|---|---|---|---|
+| lesion-wise Dice | 0.718 ± 0.091<br>[0.685, 0.750] | 0.666 ± 0.061<br>[0.644, 0.687] | 0.621 ± 0.072<br>[0.595, 0.646] | 0.480 ± 0.087<br>[0.449, 0.511] | 0.541 ± 0.093<br>[0.510, 0.575] |
+| lesion-wise Dice <20 mm³ | 0.661 ± 0.143<br>[0.601, 0.719] (n=22) | 0.567 ± 0.088<br>[0.534, 0.600] (n=26) | 0.510 ± 0.089<br>[0.472, 0.546] (n=21) | 0.375 ± 0.191<br>[0.284, 0.466] (n=17) | 0.555 ± 0.151<br>[0.491, 0.621] (n=20) |
+| lesion-wise Dice 20-100 mm³ | 0.722 ± 0.097<br>[0.687, 0.756] | 0.646 ± 0.076<br>[0.619, 0.674] | 0.615 ± 0.096<br>[0.583, 0.651] | 0.425 ± 0.096<br>[0.391, 0.462] (n=28) | 0.474 ± 0.111<br>[0.436, 0.516] (n=28) |
+| lesion-wise Dice >=100 mm³ | 0.748 ± 0.123<br>[0.703, 0.791] (n=28) | 0.766 ± 0.060<br>[0.744, 0.787] (n=28) | 0.686 ± 0.107<br>[0.647, 0.723] (n=28) | 0.542 ± 0.108<br>[0.503, 0.580] (n=28) | 0.584 ± 0.114<br>[0.544, 0.627] (n=28) |
+| lesion HD95 (mm) | 4.49 ± 4.61<br>[3.012, 6.269] | 2.51 ± 1.85<br>[1.920, 3.241] | 4.75 ± 4.11<br>[3.428, 6.322] | 7.86 ± 7.35<br>[5.436, 10.654] | 5.42 ± 3.62<br>[4.211, 6.759] |
+| lesion ASD (mm) | 1.86 ± 2.34<br>[1.127, 2.804] | 1.01 ± 1.06<br>[0.677, 1.432] | 1.89 ± 1.90<br>[1.276, 2.624] | 3.23 ± 3.35<br>[2.118, 4.487] | 2.08 ± 1.69<br>[1.521, 2.719] |
+| whole-mask HD95 (mm) † | 16.84 ± 20.85<br>[9.997, 24.837] | 1.49 ± 0.36<br>[1.371, 1.621] | 17.13 ± 20.33<br>[10.520, 24.932] | 26.17 ± 18.50<br>[19.815, 32.901] | 20.49 ± 17.42<br>[14.552, 26.883] |
+
+Detected reference lesions behind the lesion-wise values: E1 887, E2a 1136, E2b 856, E2c 548, E8 597 (of 1299).
+
+**E2c MedSAM + brain box/tiles − E1 nnU-Net**
+
+| metric | n scans | n patients | mean E2c | mean E1 | mean diff | 95% CI | Wilcoxon p | p (Holm) |
+|---|---|---|---|---|---|---|---|---|
+| lesion-wise Dice | 29 | 29 | 0.480 | 0.718 | -0.238 | [-0.272, -0.202] | 0.000 | 0.000 |
+| lesion-wise Dice <20 mm³ | 17 | 17 | 0.375 | 0.663 | -0.288 | [-0.367, -0.203] | 0.000 | 0.000 |
+| lesion-wise Dice 20-100 mm³ | 28 | 28 | 0.425 | 0.719 | -0.294 | [-0.332, -0.256] | 0.000 | 0.000 |
+| lesion-wise Dice >=100 mm³ | 28 | 28 | 0.542 | 0.748 | -0.207 | [-0.244, -0.168] | 0.000 | 0.000 |
+| lesion HD95 (mm) | 29 | 29 | 7.860 | 4.492 | 3.368 | [1.156, 5.955] | 0.004 | 0.004 |
+| lesion-wise Dice, lesions detected by both ‡ | 29 | 29 | 0.489 | 0.748 | -0.259 | [-0.288, -0.229] | 0.000 | – |
+| lesion HD95, lesions detected by both ‡ | 29 | 29 | 7.769 | 5.093 | 2.677 | [0.354, 5.279] | 0.024 | – |
+
+**E8 MedSAM + zoomed tiles − E1 nnU-Net**
+
+| metric | n scans | n patients | mean E8 | mean E1 | mean diff | 95% CI | Wilcoxon p | p (Holm) |
+|---|---|---|---|---|---|---|---|---|
+| lesion-wise Dice | 29 | 29 | 0.541 | 0.718 | -0.177 | [-0.203, -0.150] | 0.000 | 0.000 |
+| lesion-wise Dice <20 mm³ | 19 | 19 | 0.567 | 0.658 | -0.091 | [-0.174, -0.004] | 0.066 | 0.133 |
+| lesion-wise Dice 20-100 mm³ | 28 | 28 | 0.474 | 0.718 | -0.244 | [-0.278, -0.213] | 0.000 | 0.000 |
+| lesion-wise Dice >=100 mm³ | 28 | 28 | 0.584 | 0.748 | -0.164 | [-0.201, -0.128] | 0.000 | 0.000 |
+| lesion HD95 (mm) | 29 | 29 | 5.425 | 4.492 | 0.933 | [-0.184, 2.024] | 0.088 | 0.133 |
+| lesion-wise Dice, lesions detected by both ‡ | 29 | 29 | 0.551 | 0.748 | -0.196 | [-0.222, -0.169] | 0.000 | – |
+| lesion HD95, lesions detected by both ‡ | 29 | 29 | 5.501 | 5.550 | -0.049 | [-2.170, 1.709] | 0.183 | – |
+
+**E2b MedSAM + E1 boxes − E1 nnU-Net**
+
+| metric | n scans | n patients | mean E2b | mean E1 | mean diff | 95% CI | Wilcoxon p | p (Holm) |
+|---|---|---|---|---|---|---|---|---|
+| lesion-wise Dice | 29 | 29 | 0.621 | 0.718 | -0.097 | [-0.117, -0.077] | 0.000 | 0.000 |
+| lesion-wise Dice <20 mm³ | 21 | 21 | 0.510 | 0.663 | -0.153 | [-0.202, -0.101] | 0.000 | 0.000 |
+| lesion-wise Dice 20-100 mm³ | 29 | 29 | 0.615 | 0.722 | -0.107 | [-0.130, -0.084] | 0.000 | 0.000 |
+| lesion-wise Dice >=100 mm³ | 28 | 28 | 0.686 | 0.748 | -0.063 | [-0.087, -0.039] | 0.000 | 0.000 |
+| lesion HD95 (mm) | 29 | 29 | 4.753 | 4.492 | 0.261 | [-0.569, 0.923] | 0.069 | 0.069 |
+| lesion-wise Dice, lesions detected by both ‡ | 29 | 29 | 0.627 | 0.727 | -0.101 | [-0.122, -0.078] | 0.000 | – |
+| lesion HD95, lesions detected by both ‡ | 29 | 29 | 4.538 | 4.362 | 0.176 | [-0.583, 0.786] | 0.080 | – |
+
+**E8 MedSAM + zoomed tiles − E2c MedSAM + brain box/tiles**
+
+| metric | n scans | n patients | mean E8 | mean E2c | mean diff | 95% CI | Wilcoxon p | p (Holm) |
+|---|---|---|---|---|---|---|---|---|
+| lesion-wise Dice | 29 | 29 | 0.541 | 0.480 | 0.061 | [0.037, 0.087] | 0.000 | 0.000 |
+| lesion-wise Dice <20 mm³ | 17 | 17 | 0.579 | 0.375 | 0.204 | [0.095, 0.310] | 0.002 | 0.006 |
+| lesion-wise Dice 20-100 mm³ | 27 | 27 | 0.479 | 0.416 | 0.063 | [0.028, 0.100] | 0.004 | 0.008 |
+| lesion-wise Dice >=100 mm³ | 28 | 28 | 0.584 | 0.542 | 0.042 | [0.019, 0.070] | 0.001 | 0.006 |
+| lesion HD95 (mm) | 29 | 29 | 5.425 | 7.860 | -2.436 | [-4.693, -0.570] | 0.101 | 0.101 |
+| lesion-wise Dice, lesions detected by both ‡ | 29 | 29 | 0.568 | 0.496 | 0.073 | [0.046, 0.102] | 0.000 | – |
+| lesion HD95, lesions detected by both ‡ | 29 | 29 | 6.050 | 7.951 | -1.901 | [-4.331, 0.003] | 0.190 | – |
+
+### MSSEG GE
+
+8 scans, 8 patients. Mean ± SD over scans of the per-scan values, 95% CI (patient bootstrap); (n=…) = scans with at least one detected lesion (in the bin).
+
+| metric | E1 nnU-Net | E2a MedSAM + GT boxes | E2b MedSAM + E1 boxes | E2c MedSAM + brain box/tiles | E8 MedSAM + zoomed tiles |
+|---|---|---|---|---|---|
+| lesion-wise Dice | 0.699 ± 0.070<br>[0.656, 0.745] | 0.710 ± 0.071<br>[0.662, 0.753] | 0.669 ± 0.081<br>[0.615, 0.719] | 0.458 ± 0.045<br>[0.431, 0.489] | 0.511 ± 0.093<br>[0.451, 0.569] |
+| lesion-wise Dice <20 mm³ | 0.772 ± 0.084<br>[0.675, 0.821] (n=3) | 0.667 ± 0.109<br>[0.587, 0.751] (n=6) | 0.549 ± 0.229<br>[0.308, 0.762] (n=3) | 0.557 ± 0.123<br>[0.438, 0.672] (n=4) | 0.520 ± 0.107<br>[0.426, 0.636] (n=3) |
+| lesion-wise Dice 20-100 mm³ | 0.619 ± 0.077<br>[0.571, 0.669] | 0.669 ± 0.078<br>[0.620, 0.718] | 0.608 ± 0.089<br>[0.553, 0.665] | 0.467 ± 0.109<br>[0.395, 0.535] | 0.489 ± 0.139<br>[0.403, 0.581] |
+| lesion-wise Dice >=100 mm³ | 0.794 ± 0.068<br>[0.753, 0.838] | 0.778 ± 0.056<br>[0.740, 0.811] | 0.742 ± 0.072<br>[0.692, 0.783] | 0.444 ± 0.047<br>[0.414, 0.476] | 0.528 ± 0.119<br>[0.454, 0.605] |
+| lesion HD95 (mm) | 2.39 ± 1.82<br>[1.508, 3.717] | 1.33 ± 0.49<br>[1.093, 1.688] | 1.71 ± 0.39<br>[1.460, 1.964] | 2.64 ± 0.81<br>[2.185, 3.202] | 2.25 ± 0.53<br>[1.911, 2.602] |
+| lesion ASD (mm) | 0.90 ± 1.06<br>[0.444, 1.671] | 0.46 ± 0.29<br>[0.331, 0.671] | 0.52 ± 0.14<br>[0.432, 0.612] | 0.95 ± 0.16<br>[0.847, 1.054] | 0.82 ± 0.17<br>[0.714, 0.935] |
+| whole-mask HD95 (mm) † | 20.30 ± 17.03<br>[9.920, 31.592] | 1.35 ± 0.58<br>[1.063, 1.761] | 20.31 ± 16.62<br>[10.202, 31.263] | 33.24 ± 20.72<br>[20.046, 46.345] | 23.93 ± 15.17<br>[14.227, 33.581] |
+
+Detected reference lesions behind the lesion-wise values: E1 160, E2a 235, E2b 163, E2c 98, E8 103 (of 248).
+
+**E2c MedSAM + brain box/tiles − E1 nnU-Net**
+
+| metric | n scans | n patients | mean E2c | mean E1 | mean diff | 95% CI | Wilcoxon p | p (Holm) |
+|---|---|---|---|---|---|---|---|---|
+| lesion-wise Dice | 8 | 8 | 0.458 | 0.699 | -0.241 | [-0.284, -0.206] | 0.008 | 0.039 |
+| lesion-wise Dice <20 mm³ | 2 | 2 | 0.472 | 0.748 | -0.276 | [-0.418, -0.133] | 0.500 | 0.766 |
+| lesion-wise Dice 20-100 mm³ | 8 | 8 | 0.467 | 0.619 | -0.152 | [-0.207, -0.101] | 0.008 | 0.039 |
+| lesion-wise Dice >=100 mm³ | 8 | 8 | 0.444 | 0.794 | -0.350 | [-0.387, -0.315] | 0.008 | 0.039 |
+| lesion HD95 (mm) | 8 | 8 | 2.638 | 2.394 | 0.243 | [-0.915, 1.141] | 0.383 | 0.766 |
+| lesion-wise Dice, lesions detected by both ‡ | 8 | 8 | 0.461 | 0.755 | -0.293 | [-0.338, -0.250] | 0.008 | – |
+| lesion HD95, lesions detected by both ‡ | 8 | 8 | 2.714 | 1.756 | 0.958 | [0.229, 1.732] | 0.078 | – |
+
+**E8 MedSAM + zoomed tiles − E1 nnU-Net**
+
+| metric | n scans | n patients | mean E8 | mean E1 | mean diff | 95% CI | Wilcoxon p | p (Holm) |
+|---|---|---|---|---|---|---|---|---|
+| lesion-wise Dice | 8 | 8 | 0.511 | 0.699 | -0.189 | [-0.228, -0.148] | 0.008 | 0.039 |
+| lesion-wise Dice <20 mm³ | 2 | 2 | 0.463 | 0.748 | -0.285 | [-0.321, -0.249] | 0.500 | 1.000 |
+| lesion-wise Dice 20-100 mm³ | 8 | 8 | 0.489 | 0.619 | -0.130 | [-0.201, -0.064] | 0.016 | 0.047 |
+| lesion-wise Dice >=100 mm³ | 8 | 8 | 0.528 | 0.794 | -0.266 | [-0.308, -0.223] | 0.008 | 0.039 |
+| lesion HD95 (mm) | 8 | 8 | 2.246 | 2.394 | -0.148 | [-1.180, 0.586] | 0.641 | 1.000 |
+| lesion-wise Dice, lesions detected by both ‡ | 8 | 8 | 0.517 | 0.726 | -0.209 | [-0.272, -0.144] | 0.008 | – |
+| lesion HD95, lesions detected by both ‡ | 8 | 8 | 2.267 | 3.191 | -0.924 | [-3.359, 0.553] | 0.742 | – |
+
+**E2b MedSAM + E1 boxes − E1 nnU-Net**
+
+| metric | n scans | n patients | mean E2b | mean E1 | mean diff | 95% CI | Wilcoxon p | p (Holm) |
+|---|---|---|---|---|---|---|---|---|
+| lesion-wise Dice | 8 | 8 | 0.669 | 0.699 | -0.031 | [-0.047, -0.014] | 0.023 | 0.094 |
+| lesion-wise Dice <20 mm³ | 3 | 3 | 0.549 | 0.772 | -0.224 | [-0.513, -0.059] | 0.250 | 0.500 |
+| lesion-wise Dice 20-100 mm³ | 8 | 8 | 0.608 | 0.619 | -0.011 | [-0.035, 0.015] | 0.547 | 0.547 |
+| lesion-wise Dice >=100 mm³ | 8 | 8 | 0.742 | 0.794 | -0.052 | [-0.076, -0.029] | 0.016 | 0.078 |
+| lesion HD95 (mm) | 8 | 8 | 1.707 | 2.394 | -0.688 | [-1.829, -0.018] | 0.109 | 0.328 |
+| lesion-wise Dice, lesions detected by both ‡ | 8 | 8 | 0.672 | 0.699 | -0.027 | [-0.040, -0.013] | 0.023 | – |
+| lesion HD95, lesions detected by both ‡ | 8 | 8 | 1.705 | 2.394 | -0.690 | [-1.823, -0.025] | 0.109 | – |
+
+**E8 MedSAM + zoomed tiles − E2c MedSAM + brain box/tiles**
+
+| metric | n scans | n patients | mean E8 | mean E2c | mean diff | 95% CI | Wilcoxon p | p (Holm) |
+|---|---|---|---|---|---|---|---|---|
+| lesion-wise Dice | 8 | 8 | 0.511 | 0.458 | 0.052 | [0.001, 0.106] | 0.312 | 1.000 |
+| lesion-wise Dice <20 mm³ | 3 | 3 | 0.520 | 0.510 | 0.011 | [-0.116, 0.097] | 1.000 | 1.000 |
+| lesion-wise Dice 20-100 mm³ | 8 | 8 | 0.489 | 0.467 | 0.022 | [-0.063, 0.086] | 0.312 | 1.000 |
+| lesion-wise Dice >=100 mm³ | 8 | 8 | 0.528 | 0.444 | 0.084 | [0.021, 0.147] | 0.078 | 0.391 |
+| lesion HD95 (mm) | 8 | 8 | 2.246 | 2.638 | -0.392 | [-0.947, 0.048] | 0.312 | 1.000 |
+| lesion-wise Dice, lesions detected by both ‡ | 8 | 8 | 0.539 | 0.472 | 0.066 | [0.005, 0.127] | 0.109 | – |
+| lesion HD95, lesions detected by both ‡ | 8 | 8 | 2.360 | 2.704 | -0.344 | [-1.198, 0.309] | 0.742 | – |
+
+### ISBI rater 1
+
+21 scans, 5 patients. Mean ± SD over scans of the per-scan values, 95% CI (patient bootstrap); (n=…) = scans with at least one detected lesion (in the bin).
+
+| metric | E1 nnU-Net | E2a MedSAM + GT boxes | E2b MedSAM + E1 boxes | E2c MedSAM + brain box/tiles | E8 MedSAM + zoomed tiles |
+|---|---|---|---|---|---|
+| lesion-wise Dice | 0.623 ± 0.123<br>[0.542, 0.703] | 0.605 ± 0.061<br>[0.564, 0.635] | 0.542 ± 0.077<br>[0.499, 0.587] | 0.389 ± 0.079<br>[0.335, 0.437] | 0.479 ± 0.060<br>[0.431, 0.511] |
+| lesion-wise Dice <20 mm³ | 0.432 ± 0.210<br>[0.267, 0.543] (n=14) | 0.495 ± 0.165<br>[0.447, 0.578] | 0.298 ± 0.243<br>[0.181, 0.407] (n=11) | 0.746 ± 0.230<br>[0.583, 0.909] (n=2) | 0.465 ± 0.233<br>[0.292, 0.658] (n=10) |
+| lesion-wise Dice 20-100 mm³ | 0.597 ± 0.139<br>[0.517, 0.675] | 0.581 ± 0.083<br>[0.534, 0.622] | 0.495 ± 0.094<br>[0.474, 0.524] | 0.396 ± 0.104<br>[0.337, 0.454] (n=20) | 0.547 ± 0.110<br>[0.481, 0.595] (n=19) |
+| lesion-wise Dice >=100 mm³ | 0.686 ± 0.123<br>[0.581, 0.771] | 0.680 ± 0.064<br>[0.638, 0.718] | 0.616 ± 0.082<br>[0.551, 0.675] | 0.402 ± 0.124<br>[0.329, 0.479] (n=20) | 0.461 ± 0.072<br>[0.416, 0.510] |
+| lesion HD95 (mm) | 8.00 ± 7.42<br>[4.075, 12.620] | 4.11 ± 3.52<br>[2.479, 5.904] | 6.84 ± 4.87<br>[3.865, 10.115] | 4.38 ± 2.17<br>[3.075, 6.188] | 4.70 ± 1.61<br>[3.732, 5.799] |
+| lesion ASD (mm) | 3.27 ± 3.35<br>[1.513, 5.110] | 1.77 ± 1.90<br>[0.881, 2.826] | 2.71 ± 2.17<br>[1.476, 4.062] | 1.53 ± 0.59<br>[1.177, 1.979] | 1.38 ± 0.41<br>[1.180, 1.595] |
+| whole-mask HD95 (mm) † | 15.13 ± 13.56<br>[7.563, 26.024] | 2.18 ± 0.34<br>[2.000, 2.492] | 18.80 ± 14.79<br>[11.335, 29.138] | 39.24 ± 14.60<br>[27.400, 50.420] | 17.74 ± 6.13<br>[13.564, 21.055] |
+
+Detected reference lesions behind the lesion-wise values: E1 346, E2a 467, E2b 332, E2c 112, E8 202 (of 533).
+
+**E2c MedSAM + brain box/tiles − E1 nnU-Net**
+
+| metric | n scans | n patients | mean E2c | mean E1 | mean diff | 95% CI | Wilcoxon p | p (Holm) |
+|---|---|---|---|---|---|---|---|---|
+| lesion-wise Dice | 21 | 5 | 0.389 | 0.623 | -0.234 | [-0.323, -0.111] | 0.062 | 0.312 |
+| lesion-wise Dice <20 mm³ | 2 | 2 | 0.746 | 0.137 | 0.609 | [0.335, 0.883] | 0.500 | 0.500 |
+| lesion-wise Dice 20-100 mm³ | 20 | 5 | 0.396 | 0.601 | -0.204 | [-0.321, -0.066] | 0.125 | 0.375 |
+| lesion-wise Dice >=100 mm³ | 20 | 5 | 0.402 | 0.681 | -0.278 | [-0.390, -0.157] | 0.062 | 0.312 |
+| lesion HD95 (mm) | 21 | 5 | 4.376 | 8.003 | -3.627 | [-8.391, -0.550] | 0.125 | 0.375 |
+| lesion-wise Dice, lesions detected by both ‡ | 21 | 5 | 0.404 | 0.627 | -0.223 | [-0.330, -0.091] | 0.125 | – |
+| lesion HD95, lesions detected by both ‡ | 21 | 5 | 4.239 | 9.810 | -5.570 | [-10.306, -1.780] | 0.062 | – |
+
+**E8 MedSAM + zoomed tiles − E1 nnU-Net**
+
+| metric | n scans | n patients | mean E8 | mean E1 | mean diff | 95% CI | Wilcoxon p | p (Holm) |
+|---|---|---|---|---|---|---|---|---|
+| lesion-wise Dice | 21 | 5 | 0.479 | 0.623 | -0.144 | [-0.237, -0.039] | 0.125 | 0.500 |
+| lesion-wise Dice <20 mm³ | 6 | 3 | 0.548 | 0.414 | 0.134 | [-0.077, 0.774] | 0.750 | 1.000 |
+| lesion-wise Dice 20-100 mm³ | 19 | 5 | 0.547 | 0.607 | -0.060 | [-0.187, 0.037] | 0.625 | 1.000 |
+| lesion-wise Dice >=100 mm³ | 21 | 5 | 0.461 | 0.686 | -0.226 | [-0.325, -0.116] | 0.062 | 0.312 |
+| lesion HD95 (mm) | 21 | 5 | 4.699 | 8.003 | -3.304 | [-8.398, 0.154] | 0.312 | 0.938 |
+| lesion-wise Dice, lesions detected by both ‡ | 21 | 5 | 0.482 | 0.639 | -0.156 | [-0.257, -0.047] | 0.125 | – |
+| lesion HD95, lesions detected by both ‡ | 21 | 5 | 4.664 | 9.553 | -4.888 | [-9.985, -0.969] | 0.125 | – |
+
+**E2b MedSAM + E1 boxes − E1 nnU-Net**
+
+| metric | n scans | n patients | mean E2b | mean E1 | mean diff | 95% CI | Wilcoxon p | p (Holm) |
+|---|---|---|---|---|---|---|---|---|
+| lesion-wise Dice | 21 | 5 | 0.542 | 0.623 | -0.081 | [-0.116, -0.032] | 0.125 | 0.625 |
+| lesion-wise Dice <20 mm³ | 10 | 4 | 0.323 | 0.392 | -0.069 | [-0.156, 0.027] | 0.250 | 0.625 |
+| lesion-wise Dice 20-100 mm³ | 21 | 5 | 0.495 | 0.597 | -0.102 | [-0.155, -0.035] | 0.125 | 0.625 |
+| lesion-wise Dice >=100 mm³ | 21 | 5 | 0.616 | 0.686 | -0.070 | [-0.120, -0.013] | 0.125 | 0.625 |
+| lesion HD95 (mm) | 21 | 5 | 6.841 | 8.003 | -1.162 | [-3.903, 0.896] | 0.812 | 0.812 |
+| lesion-wise Dice, lesions detected by both ‡ | 21 | 5 | 0.551 | 0.634 | -0.082 | [-0.121, -0.029] | 0.125 | – |
+| lesion HD95, lesions detected by both ‡ | 21 | 5 | 6.914 | 7.830 | -0.916 | [-3.170, 0.808] | 0.812 | – |
+
+**E8 MedSAM + zoomed tiles − E2c MedSAM + brain box/tiles**
+
+| metric | n scans | n patients | mean E8 | mean E2c | mean diff | 95% CI | Wilcoxon p | p (Holm) |
+|---|---|---|---|---|---|---|---|---|
+| lesion-wise Dice | 21 | 5 | 0.479 | 0.389 | 0.090 | [0.058, 0.123] | 0.062 | 0.312 |
+| lesion-wise Dice <20 mm³ | 2 | 2 | 0.724 | 0.746 | -0.022 | [-0.109, 0.064] | 1.000 | 1.000 |
+| lesion-wise Dice 20-100 mm³ | 19 | 5 | 0.547 | 0.402 | 0.145 | [0.085, 0.199] | 0.062 | 0.312 |
+| lesion-wise Dice >=100 mm³ | 20 | 5 | 0.466 | 0.402 | 0.063 | [0.024, 0.107] | 0.062 | 0.312 |
+| lesion HD95 (mm) | 21 | 5 | 4.699 | 4.376 | 0.323 | [-0.655, 1.085] | 0.812 | 1.000 |
+| lesion-wise Dice, lesions detected by both ‡ | 20 | 5 | 0.538 | 0.406 | 0.132 | [0.084, 0.181] | 0.062 | – |
+| lesion HD95, lesions detected by both ‡ | 20 | 5 | 4.193 | 4.711 | -0.518 | [-1.194, 0.479] | 0.438 | – |
+
+### ISBI rater 2
+
+21 scans, 5 patients. Mean ± SD over scans of the per-scan values, 95% CI (patient bootstrap); (n=…) = scans with at least one detected lesion (in the bin).
+
+| metric | E1 nnU-Net | E2a MedSAM + GT boxes | E2b MedSAM + E1 boxes | E2c MedSAM + brain box/tiles | E8 MedSAM + zoomed tiles |
+|---|---|---|---|---|---|
+| lesion-wise Dice | 0.614 ± 0.130<br>[0.522, 0.698] | 0.574 ± 0.053<br>[0.532, 0.612] | 0.526 ± 0.085<br>[0.466, 0.585] | 0.371 ± 0.088<br>[0.310, 0.440] | 0.487 ± 0.062<br>[0.448, 0.519] |
+| lesion-wise Dice <20 mm³ | 0.365 ± 0.243<br>[0.232, 0.493] (n=12) | 0.372 ± 0.146<br>[0.307, 0.417] (n=20) | 0.247 ± 0.196<br>[0.155, 0.329] (n=11) | 0.444 ± nan<br>[0.444, 0.444] (n=1) | 0.541 ± 0.198<br>[0.499, 0.667] (n=4) |
+| lesion-wise Dice 20-100 mm³ | 0.561 ± 0.162<br>[0.454, 0.659] | 0.536 ± 0.052<br>[0.515, 0.553] | 0.452 ± 0.115<br>[0.403, 0.502] | 0.359 ± 0.107<br>[0.287, 0.440] (n=19) | 0.548 ± 0.104<br>[0.500, 0.581] (n=19) |
+| lesion-wise Dice >=100 mm³ | 0.694 ± 0.100<br>[0.618, 0.753] | 0.673 ± 0.050<br>[0.638, 0.705] | 0.607 ± 0.081<br>[0.554, 0.664] | 0.383 ± 0.113<br>[0.312, 0.471] | 0.463 ± 0.085<br>[0.427, 0.503] |
+| lesion HD95 (mm) | 8.83 ± 8.15<br>[3.744, 14.424] | 3.35 ± 1.78<br>[2.229, 4.614] | 7.12 ± 5.44<br>[4.183, 10.358] | 4.37 ± 1.90<br>[3.177, 6.041] | 4.43 ± 1.85<br>[3.369, 5.729] |
+| lesion ASD (mm) | 3.85 ± 3.97<br>[1.308, 6.655] | 1.39 ± 0.95<br>[0.802, 2.037] | 2.94 ± 2.44<br>[1.652, 4.361] | 1.55 ± 0.50<br>[1.209, 1.956] | 1.31 ± 0.38<br>[1.131, 1.491] |
+| whole-mask HD95 (mm) † | 16.16 ± 13.15<br>[7.001, 27.014] | 2.17 ± 0.54<br>[1.886, 2.570] | 16.71 ± 12.56<br>[8.262, 26.896] | 31.04 ± 13.42<br>[19.980, 42.110] | 19.63 ± 3.48<br>[17.312, 21.524] |
+
+Detected reference lesions behind the lesion-wise values: E1 404, E2a 596, E2b 371, E2c 119, E8 200 (of 714).
+
+**E2c MedSAM + brain box/tiles − E1 nnU-Net**
+
+| metric | n scans | n patients | mean E2c | mean E1 | mean diff | 95% CI | Wilcoxon p | p (Holm) |
+|---|---|---|---|---|---|---|---|---|
+| lesion-wise Dice | 21 | 5 | 0.371 | 0.614 | -0.243 | [-0.344, -0.089] | 0.125 | 0.500 |
+| lesion-wise Dice <20 mm³ | 1 | 1 | 0.444 | 0.508 | -0.063 | [-0.063, -0.063] | 1.000 | 1.000 |
+| lesion-wise Dice 20-100 mm³ | 19 | 5 | 0.359 | 0.569 | -0.209 | [-0.323, -0.018] | 0.125 | 0.500 |
+| lesion-wise Dice >=100 mm³ | 21 | 5 | 0.383 | 0.694 | -0.311 | [-0.401, -0.204] | 0.062 | 0.312 |
+| lesion HD95 (mm) | 21 | 5 | 4.373 | 8.830 | -4.456 | [-9.742, 0.197] | 0.312 | 0.625 |
+| lesion-wise Dice, lesions detected by both ‡ | 21 | 5 | 0.377 | 0.638 | -0.261 | [-0.361, -0.097] | 0.125 | – |
+| lesion HD95, lesions detected by both ‡ | 21 | 5 | 4.452 | 11.137 | -6.684 | [-14.088, -0.314] | 0.125 | – |
+
+**E8 MedSAM + zoomed tiles − E1 nnU-Net**
+
+| metric | n scans | n patients | mean E8 | mean E1 | mean diff | 95% CI | Wilcoxon p | p (Holm) |
+|---|---|---|---|---|---|---|---|---|
+| lesion-wise Dice | 21 | 5 | 0.487 | 0.614 | -0.127 | [-0.207, -0.023] | 0.125 | 0.500 |
+| lesion-wise Dice <20 mm³ | 4 | 2 | 0.541 | 0.360 | 0.181 | [0.123, 0.356] | 0.500 | 1.000 |
+| lesion-wise Dice 20-100 mm³ | 19 | 5 | 0.548 | 0.565 | -0.016 | [-0.138, 0.108] | 0.812 | 1.000 |
+| lesion-wise Dice >=100 mm³ | 21 | 5 | 0.463 | 0.694 | -0.231 | [-0.297, -0.138] | 0.062 | 0.312 |
+| lesion HD95 (mm) | 21 | 5 | 4.432 | 8.830 | -4.398 | [-9.700, 0.423] | 0.312 | 0.938 |
+| lesion-wise Dice, lesions detected by both ‡ | 21 | 5 | 0.484 | 0.640 | -0.155 | [-0.232, -0.035] | 0.125 | – |
+| lesion HD95, lesions detected by both ‡ | 21 | 5 | 4.541 | 10.960 | -6.419 | [-14.495, 0.408] | 0.312 | – |
+
+**E2b MedSAM + E1 boxes − E1 nnU-Net**
+
+| metric | n scans | n patients | mean E2b | mean E1 | mean diff | 95% CI | Wilcoxon p | p (Holm) |
+|---|---|---|---|---|---|---|---|---|
+| lesion-wise Dice | 21 | 5 | 0.526 | 0.614 | -0.088 | [-0.121, -0.029] | 0.125 | 0.625 |
+| lesion-wise Dice <20 mm³ | 9 | 4 | 0.249 | 0.340 | -0.091 | [-0.121, -0.057] | 0.125 | 0.625 |
+| lesion-wise Dice 20-100 mm³ | 21 | 5 | 0.452 | 0.561 | -0.109 | [-0.168, -0.043] | 0.125 | 0.625 |
+| lesion-wise Dice >=100 mm³ | 21 | 5 | 0.607 | 0.694 | -0.087 | [-0.139, -0.024] | 0.125 | 0.625 |
+| lesion HD95 (mm) | 21 | 5 | 7.123 | 8.830 | -1.706 | [-4.600, 0.964] | 0.812 | 0.812 |
+| lesion-wise Dice, lesions detected by both ‡ | 21 | 5 | 0.534 | 0.628 | -0.094 | [-0.124, -0.050] | 0.062 | – |
+| lesion HD95, lesions detected by both ‡ | 21 | 5 | 7.104 | 8.528 | -1.423 | [-3.744, 0.600] | 0.812 | – |
+
+**E8 MedSAM + zoomed tiles − E2c MedSAM + brain box/tiles**
+
+| metric | n scans | n patients | mean E8 | mean E2c | mean diff | 95% CI | Wilcoxon p | p (Holm) |
+|---|---|---|---|---|---|---|---|---|
+| lesion-wise Dice | 21 | 5 | 0.487 | 0.371 | 0.116 | [0.071, 0.153] | 0.062 | 0.250 |
+| lesion-wise Dice <20 mm³ | 0 | 0 | – | – | – | – | – | – |
+| lesion-wise Dice 20-100 mm³ | 18 | 5 | 0.549 | 0.366 | 0.183 | [0.094, 0.270] | 0.062 | 0.250 |
+| lesion-wise Dice >=100 mm³ | 21 | 5 | 0.463 | 0.383 | 0.080 | [0.030, 0.123] | 0.125 | 0.250 |
+| lesion HD95 (mm) | 21 | 5 | 4.432 | 4.373 | 0.059 | [-0.475, 0.449] | 0.812 | 0.812 |
+| lesion-wise Dice, lesions detected by both ‡ | 21 | 5 | 0.509 | 0.372 | 0.136 | [0.087, 0.181] | 0.062 | – |
+| lesion HD95, lesions detected by both ‡ | 21 | 5 | 4.540 | 4.804 | -0.264 | [-0.823, 0.557] | 0.625 | – |
+
+![segq_lesion_dice_by_bin](figures/segq_lesion_dice_by_bin.png)
+
+### Appendix — whole-mask IoU
+
+IoU = |A ∩ B| / |A ∪ B| on the raw masks (monotone in whole-mask Dice: IoU = Dice / (2 − Dice) per scan); mean ± SD over scans, 95% CI (patient bootstrap).
+
+| model | MSSEG in-dist. | MSSEG GE | ISBI rater 1 | ISBI rater 2 |
+|---|---|---|---|---|
+| E1 nnU-Net | 0.610 ± 0.166<br>[0.549, 0.669] | 0.522 ± 0.187<br>[0.400, 0.640] | 0.578 ± 0.118<br>[0.472, 0.671] | 0.538 ± 0.138<br>[0.434, 0.642] |
+| E2a MedSAM + GT boxes | 0.637 ± 0.066<br>[0.614, 0.661] | 0.657 ± 0.028<br>[0.641, 0.678] | 0.565 ± 0.030<br>[0.542, 0.587] | 0.543 ± 0.043<br>[0.512, 0.572] |
+| E2b MedSAM + E1 boxes | 0.516 ± 0.145<br>[0.462, 0.566] | 0.452 ± 0.159<br>[0.346, 0.548] | 0.479 ± 0.074<br>[0.420, 0.536] | 0.441 ± 0.093<br>[0.370, 0.512] |
+| E2c MedSAM + brain box/tiles | 0.341 ± 0.171<br>[0.280, 0.403] | 0.179 ± 0.066<br>[0.136, 0.222] | 0.106 ± 0.032<br>[0.085, 0.130] | 0.092 ± 0.031<br>[0.072, 0.116] |
+| E8 MedSAM + zoomed tiles | 0.399 ± 0.169<br>[0.339, 0.460] | 0.255 ± 0.094<br>[0.196, 0.319] | 0.253 ± 0.066<br>[0.202, 0.287] | 0.225 ± 0.071<br>[0.169, 0.276] |
+
+<!-- segq:end -->
