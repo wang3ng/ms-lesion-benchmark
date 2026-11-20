@@ -48,3 +48,24 @@ Phase 1 0.62 s per update (SAM forward at 1024 px), phase 2 / baseline 0.33 s pe
 phase-1 backbone and decoder (only its new head is initialised); predictions 7 s per case per model. After
 2 epochs the phase-2 model already gives lesion voxels a higher foreground probability than background
 (0.27 vs 0.20 on a training case). Estimated total: ~4.5 GPU-h training + ~0.5 h predictions.
+
+## Run (2026-11-20)
+
+`scripts/run_E7.sh`: 15 training runs, all exit 0 — per fold phase 1 25 min, phase 2 7 min, HarDNet baseline
+20 min (4 h 23 min in total on the RTX 4090), then predictions (CV per fold model; test sets as 5-fold ensembles,
+59 scans per model; ~18 min), CV scoring with `scripts/evaluate.py` and `scripts/e7_summary.py`.
+
+## Results (exploratory; details, CIs and Holm-adjusted tests in `results/E7/summary.md`)
+
+| Lesion F1 (mean over scans) | E1 nnU-Net | E7 MS-SAMLess | E7 HarDNet Segmentor |
+|---|---|---|---|
+| Cross-validation (15) | 0.693 | 0.421 | 0.492 |
+| MSSEG in-distribution (29) | 0.725 | 0.513 | 0.611 |
+| MSSEG GE (8) | 0.648 | 0.488 | 0.550 |
+| ISBI rater 1 / 2 (21 scans, 5 patients) | 0.649 / 0.616 | 0.431 / 0.386 | 0.511 / 0.450 |
+
+- E7 − E1: lower lesion F1 everywhere (MSSEG in-distribution −0.21 [−0.26, −0.17], Holm p < 0.001), driven by
+  precision (≈ 3–5x more false-positive lesions per scan); lesion recall similar overall (higher on GE, +0.13).
+- E7 − HarDNet: SAM's guidance did not help here — similar Dice and recall, but more false positives and lower
+  lesion F1 (MSSEG in-distribution −0.098 [−0.130, −0.068], Holm p < 0.001).
+- Both E7 models are far better than the frozen MedSAM E2c/E8 conditions but below nnU-Net.
