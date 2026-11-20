@@ -37,14 +37,16 @@ from msbench.reporting import (
 )
 from msbench.stats import paired_bootstrap_diff_ci, paired_bootstrap_ratio_diff_ci, paired_wilcoxon
 
-MODELS = ["E1", "E2a", "E2b", "E2c"]
+MODELS = ["E1", "E2a", "E2b", "E2c", "E8"]
 REQUIRED = ["E1", "E2a", "E2c"]       # E2b is optional (gated on E2c passing the collapse check)
 RUN1 = "E2c_run1"                     # first E2c run, collapsed; appendix only
 MODEL_LABELS = {"E1": "E1 nnU-Net", "E2a": "E2a MedSAM + oracle boxes", "E2b": "E2b MedSAM + E1 boxes",
-                "E2c": "E2c MedSAM + brain box/tiles", RUN1: "E2c run 1 (collapsed)"}
+                "E2c": "E2c MedSAM + brain box/tiles", "E8": "E8 MedSAM + zoomed tiles", RUN1: "E2c run 1 (collapsed)",
+                "E2c_iou": "E2c + IoU filter (post hoc)", "E8_iou": "E8 + IoU filter (post hoc)"}
+POSTHOC = ["E2c_iou", "E8_iou"]       # exploratory predicted-IoU filter (scripts/iou_filter_analysis.py)
 # fixed per model in palette order (E2b got the 4th hue when it was added)
-MODEL_COLORS = {"E1": "#2a78d6", "E2a": "#eb6834", "E2c": "#1baf7a", "E2b": "#eda100"}
-COMPARISONS = [("E2c", "E1"), ("E2a", "E2c"), ("E2b", "E1")]
+MODEL_COLORS = {"E1": "#2a78d6", "E2a": "#eb6834", "E2c": "#1baf7a", "E2b": "#eda100", "E8": "#e87ba4"}
+COMPARISONS = [("E2c", "E1"), ("E2a", "E2c"), ("E2b", "E1"), ("E8", "E2c"), ("E8", "E1")]
 
 
 def collapse_rows(exp: str, cfg: dict) -> list[dict]:
@@ -74,7 +76,34 @@ def collapse_rows(exp: str, cfg: dict) -> list[dict]:
 def pred_dir(exp: str, fold: int, cfg: dict) -> Path:
     if exp == "E1":
         return nnunet_fold_dir(fold, cfg) / "validation"
+    if exp.endswith("_iou"):
+        return paths(cfg)["medsam_runs"] / exp[:-4] / f"fold_{fold}" / "validation_iou"
     return paths(cfg)["medsam_runs"] / exp / f"fold_{fold}" / "validation"
+
+
+def fp_by_bin(predl: pd.DataFrame, exps: list[str], names: list[str], n_scans: int) -> pd.DataFrame:
+    """False-positive lesions per scan in each size bin (bin of the FP lesion's own volume)."""
+    rows = []
+    for e in exps:
+        f = predl[(predl.model == e) & ~predl.true_positive]
+        rows.append({"model": e, **{b: (f.bin == b).sum() / n_scans for b in names}, "all": len(f) / n_scans})
+    return pd.DataFrame(rows)
+
+
+def fig_fp_bins(fpb: pd.DataFrame, names: list[str], out: Path) -> None:
+    fig, ax = new_fig(7.2, 4.0)
+    x = np.arange(len(names))
+    w = 0.8 / len(fpb)
+    for j, (_, r) in enumerate(fpb.iterrows()):
+        xs = x + (j - (len(fpb) - 1) / 2) * w
+        ax.bar(xs, [r[b] for b in names], width=w, color=MODEL_COLORS[r["model"]], edgecolor=SURFACE, linewidth=2,
+               label=MODEL_LABELS[r["model"]], zorder=2)
+    ax.set_yscale("symlog", linthresh=1)
+    ax.set_xticks(x, [f"{b} mm³" for b in names], color=INK, fontsize=9)
+    ax.set_ylabel("False-positive lesions per scan (symlog)", color=INK2, fontsize=9)
+    ax.set_title("False positives per scan by lesion volume, cross-validation", color=INK, fontsize=11, loc="left")
+    ax.legend(frameon=False, fontsize=8, labelcolor=INK2, loc="upper right")
+    save_fig(fig, out)
 
 
 def load_model(exp: str, splits: list[dict], results_dir: Path) -> tuple[pd.DataFrame | None, list[int]]:
@@ -234,11 +263,13 @@ def main(argv=None) -> int:
     alive = job_alive(Path(os.environ.get("MSBENCH_LOGS", paths(cfg)["logs"])) / "E2", marker="run_E2")
 
     data, folds = {}, {}
-    for exp in MODELS + [RUN1]:
+    for exp in MODELS + [RUN1] + POSTHOC:
         df, fl = load_model(exp, splits, args.results_dir)
         if df is not None:
             data[exp], folds[exp] = mask_empty_bins(df, names), fl
     run1 = data.pop(RUN1, None)
+    posthoc = {e: data.pop(e) for e in POSTHOC if e in data}
+    folds_ph = {e: folds.pop(e) for e in POSTHOC if e in folds}
     md: list[str] = []
     add = md.append
     add("# E2 cross-validation comparison — E1 nnU-Net vs MedSAM (E2a oracle boxes, E2b E1 boxes, E2c brain box + tiles)\n")
@@ -359,6 +390,24 @@ def main(argv=None) -> int:
     add("\n![fp_volume_hist](figures/fp_volume_hist.png)\n")
     fig_fp_hist(fp, exps, small_edge, float(rule["min_lesion_mm3"]), n_scans, figs / "fp_volume_hist.png")
 
+    # ---- recall and false positives by size bin
+    fpb = fp_by_bin(predl, exps, names, n_scans)
+    fpb.to_csv(tables / "fp_per_scan_by_size_bin.csv", index=False)
+    add("## Recall and false positives by size bin\n")
+    add("Recall: pooled detected / reference lesions in the bin. FP / scan: false-positive lesions whose own "
+        "volume falls in the bin, per scan.\n")
+    rows = []
+    for e in exps:
+        row = {"model": MODEL_LABELS[e]}
+        for b in names:
+            r = rec[e][(rec[e].scanner == "all") & (rec[e].bin_mm3 == b)].iloc[0]
+            row[f"recall {b}"] = f"{r.recall:.3f}"
+            row[f"FP/scan {b}"] = f"{fpb.set_index('model').loc[e, b]:.1f}"
+        rows.append(row)
+    add(md_table(pd.DataFrame(rows), index=False))
+    add("\n![fp_per_scan_by_size_bin](figures/fp_per_scan_by_size_bin.png)\n")
+    fig_fp_bins(fpb, names, figs / "fp_per_scan_by_size_bin.png")
+
     # ---- missed lesions
     mrows = []
     for e in exps:
@@ -443,7 +492,7 @@ def main(argv=None) -> int:
         add("_Needs both E2a and E2c._\n")
 
     # ---- collapse check
-    crow = [r for e in ("E2c", "E2b") for r in collapse_rows(e, cfg)]
+    crow = [r for e in ("E2c", "E2b", "E8") for r in collapse_rows(e, cfg)]
     add("## Collapse check (training data only)\n")
     cc = ft["collapse_check"]
     add(f"Logged on the training batches of each fold: lesion-box loss vs its value over steps 1–{cc['window']}, "
@@ -458,13 +507,73 @@ def main(argv=None) -> int:
     else:
         add("_No collapse-check results yet._")
     add("")
-    for e in ("E2c", "E2b"):
+    for e in ("E2c", "E2b", "E8"):
         f = tables / f"box_diagnostics_{e}.csv"
         if f.exists():
             add(f"Box diagnostics, {MODEL_LABELS[e]} (final checkpoint, 4 training patients per fold, "
                 "`scripts/medsam_box_diagnostics.py`):\n")
             add(md_table(pd.read_csv(f), index=False))
             add("")
+
+    # ---- exploratory post-hoc IoU filter
+    ic = cfg["analysis"]["iou_filter"]
+    add(f"## Exploratory: predicted-IoU mask filter ({ic['label']})\n")
+    add("> **Post hoc, decided after seeing E2c results; exploratory, not part of the pre-specified comparison.** "
+        "A box whose MedSAM predicted-IoU score is below a threshold t gets an empty mask (it still counts in the "
+        "per-pixel coverage). t is chosen per outer fold by nested cross-validation inside that fold's 12 training "
+        f"patients ({ic['inner_folds']} inner folds, inner models trained with the same recipe; criterion: mean "
+        "per-patient lesion F1 on the inner held-out patients, ties to the lowest t), then applied to the fold's "
+        "validation patients, which are never used to choose it (`scripts/iou_filter_analysis.py`). Not applied "
+        "to any test set.\n")
+    sel_f = tables / "iou_filter_selection.csv"
+    if sel_f.exists():
+        add("Thresholds selected per outer fold (inner mean lesion F1 without / with the filter):\n")
+        add(md_table(pd.read_csv(sel_f), index=False))
+        add("")
+    ph_done = False
+    for base, ph in (("E2c", "E2c_iou"), ("E8", "E8_iou")):
+        if ph not in posthoc or base not in cases or not set(common) <= set(posthoc[ph].case_id):
+            continue
+        ph_done = True
+        c2 = posthoc[ph][posthoc[ph].case_id.isin(common)].sort_values("case_id").reset_index(drop=True)
+        rec2 = pooled_bin_recall(c2, names, ci_kw)
+        rl, pl = [], []
+        for k in sorted(c2.fold.unique()):
+            ids = sorted(c2[c2.fold == k].case_id)
+            r_, p_ = lesion_tables(pred_dir(ph, int(k), cfg), ids, cfg=cfg, fold=int(k))
+            pl.append(p_.assign(model=ph))
+        fpb2 = fp_by_bin(pd.concat(pl, ignore_index=True), [ph], names, n_scans).set_index("model")
+        fpb1 = fpb.set_index("model")
+        rows = []
+        for m in ["lesion_f1", "fp_lesions", "lesion_precision", "lesion_recall", "dice"]:
+            xa, xb = c2[m].to_numpy(float), cases[base][m].to_numpy(float)
+            ci = paired_bootstrap_diff_ci(xa, xb, **ci_kw)
+            w = paired_wilcoxon(xa, xb)
+            rows.append({"metric": m, "unfiltered": f"{np.nanmean(xb):.3f} ± {np.nanstd(xb, ddof=1):.3f}",
+                         "filtered": f"{np.nanmean(xa):.3f} ± {np.nanstd(xa, ddof=1):.3f}",
+                         "diff (filtered − unfiltered)": f"{ci['estimate']:.3f} {fmt_interval(ci['low'], ci['high'])}",
+                         "Wilcoxon p (unadjusted)": f"{w['p']:.3g}"})
+        for b in names:
+            r1 = rec[base][(rec[base].scanner == "all") & (rec[base].bin_mm3 == b)].iloc[0]
+            r2 = rec2[(rec2.scanner == "all") & (rec2.bin_mm3 == b)].iloc[0]
+            d = paired_bootstrap_ratio_diff_ci(c2[f"detected_{b}"], cases[base][f"detected_{b}"],
+                                               cases[base][f"n_ref_{b}"], **ci_kw)
+            rows.append({"metric": f"pooled recall {b}", "unfiltered": f"{r1.detected}/{r1.reference_lesions} = {r1.recall:.3f}",
+                         "filtered": f"{r2.detected}/{r2.reference_lesions} = {r2.recall:.3f}",
+                         "diff (filtered − unfiltered)": f"{d['estimate']:.3f} {fmt_interval(d['low'], d['high'])}",
+                         "Wilcoxon p (unadjusted)": "–"})
+        for b in names:
+            rows.append({"metric": f"FP / scan {b}", "unfiltered": f"{fpb1.loc[base, b]:.1f}",
+                         "filtered": f"{fpb2.loc[ph, b]:.1f}",
+                         "diff (filtered − unfiltered)": f"{fpb2.loc[ph, b] - fpb1.loc[base, b]:.1f}",
+                         "Wilcoxon p (unadjusted)": "–"})
+        add(f"### {MODEL_LABELS[base]}: unfiltered vs IoU-filtered ({len(common)} patients)\n")
+        t = pd.DataFrame(rows)
+        add(md_table(t, index=False))
+        add("")
+        t.assign(model=base).to_csv(tables / f"iou_filter_{base}.csv", index=False)
+    if not ph_done:
+        add("_IoU-filter results not available yet._\n")
 
     # ---- per patient
     add("## Per-patient results\n")

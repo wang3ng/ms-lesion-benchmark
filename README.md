@@ -202,6 +202,12 @@ Keep one preprocessed cohort at a time if the disk budget is 50 GB.
 Checkpoints for unused folds can be deleted after the fold's metrics are
 exported.
 
+**MedSAM embedding caches (lab RTX 4090 machine).** Slice embeddings: `../cache/medsam_embeddings`
+(28 GB, all 74 cases). E8 zoomed-tile embeddings, MSSEG training cases only: `/home/kirby/msbench_e8_cache`
+(~101 GB on the NVMe system disk, mode 700, `paths.medsam_e8_cache`; the data HDD is too slow for random
+reads). **Delete the E8 cache once the experiments are frozen:** `rm -rf /home/kirby/msbench_e8_cache`
+(tracked in `TODO.md`). Test-set tile embeddings are never cached.
+
 ## Repository layout
 
 ```

@@ -9,7 +9,7 @@
 Folds are E1's (experiments/E1/splits_final.json): the 12 training patients of
 fold k train the prompt encoder + mask decoder, the 3 validation patients are
 predicted with the same box type (E2a oracle from the consensus, E2c brain box +
-tiles, E2b boxes from E1 out-of-fold predictions). Output:
+tiles, E2b boxes from E1 out-of-fold predictions, E8 brain box + zoomed tiles). Output:
 <medsam_runs>/<exp>/fold_<k>/{checkpoint_final.pt, run.json, validation/<case>.nii.gz}.
 Score with: python scripts/evaluate.py --exp <exp> --fold k --pred-dir .../validation
 Settings: configs/experiment.yaml (models.medsam.finetune, .inference, boxes).
@@ -60,11 +60,12 @@ def main(argv=None) -> int:
     seed = int(cfg["seed"]) + 100 * args.fold
     oof = Path(os.environ.get("MSBENCH_RESULTS", REPO_ROOT / "results")) / "E1" / "oof_predictions"
     box_dir = oof if cond == "nnunet" else None
+    zoom = cond == "zoomed"
     run_dir = paths(cfg)["medsam_runs"] / args.exp / f"fold_{args.fold}"
 
     log(f"{args.exp} ({cond} boxes) fold {args.fold}: {len(split['train'])} train / {len(split['val'])} val patients")
     t = time.time()
-    train_cases = [load_case(c, cfg, with_ref=True, box_source_dir=box_dir) for c in split["train"]]
+    train_cases = [load_case(c, cfg, with_ref=True, box_source_dir=box_dir, zoom=zoom) for c in split["train"]]
     log(f"loaded training cases in {time.time() - t:.0f} s; "
         f"pools: {BoxSampler(train_cases, cond, cfg, seed).counts()}")
 
@@ -77,7 +78,7 @@ def main(argv=None) -> int:
             if not args.no_predict and not r["collapsed"]:
                 model = load_medsam(cfg)
                 load_trainable(model, torch.load(tmp / "checkpoint_final.pt", weights_only=False))
-                cd = load_case(split["val"][0], cfg, with_ref=True, box_source_dir=box_dir)
+                cd = load_case(split["val"][0], cfg, with_ref=True, box_source_dir=box_dir, zoom=zoom)
                 t = time.time()
                 predict_case(model, cd, cond, cfg, seed)
                 t_case = time.time() - t
@@ -119,7 +120,7 @@ def main(argv=None) -> int:
         if (val_dir / f"{c}.nii.gz").exists():
             continue
         t = time.time()
-        cd = load_case(c, cfg, with_ref=(cond == "oracle"), box_source_dir=box_dir)
+        cd = load_case(c, cfg, with_ref=(cond == "oracle"), box_source_dir=box_dir, zoom=zoom)
         save_prediction(predict_case(model, cd, cond, cfg, seed), c, cfg, val_dir)
         log(f"predicted {c} in {time.time() - t:.0f} s")
 

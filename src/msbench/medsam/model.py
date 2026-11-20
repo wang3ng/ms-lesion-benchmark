@@ -25,8 +25,10 @@ def load_medsam(cfg: dict | None = None, device: str = "cuda"):
     return model.to(device).eval()
 
 
-def decode(model, embeddings: torch.Tensor, boxes_1024: torch.Tensor) -> torch.Tensor:
+def decode(model, embeddings: torch.Tensor, boxes_1024: torch.Tensor, return_iou: bool = False):
     """Low-res mask logits (B, 1, 256, 256) for B (embedding, box) pairs, one box per embedding.
+
+    With return_iou=True also returns SAM's predicted-IoU score of each mask, shape (B,).
 
     Same computation as SAM's MaskDecoder.predict_masks with multimask_output=False,
     except that embeddings are NOT repeated per prompt (MedSAM's change to SAM,
@@ -48,4 +50,7 @@ def decode(model, embeddings: torch.Tensor, boxes_1024: torch.Tensor) -> torch.T
                             for i in range(dec.num_mask_tokens)], dim=1)
     b, c, h, w = up.shape
     masks = (hyper_in @ up.view(b, c, h * w)).view(b, -1, h, w)
+    if return_iou:
+        iou = dec.iou_prediction_head(hs[:, 0, :])
+        return masks[:, 0:1], iou[:, 0]
     return masks[:, 0:1]

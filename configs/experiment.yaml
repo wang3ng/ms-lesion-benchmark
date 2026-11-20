@@ -14,6 +14,10 @@ paths:
   medsam_checkpoint: ../models/medsam/medsam_vit_b.pth   # official MedSAM ViT-B (bowang-lab, 2023-08)
   medsam_cache: ../cache/medsam_embeddings              # frozen-encoder embeddings, one .npy per case
   medsam_runs: ../medsam_runs                           # fine-tuned decoders + predictions
+  # E8 zoomed-tile embeddings, MSSEG training cases only (~94 GB). Machine-specific: NVMe system disk of
+  # the lab RTX 4090 box (the data HDD is too slow for random reads), mode 700. DELETE after the project
+  # (TODO.md). Test-set tile embeddings are never cached (computed on the fly).
+  medsam_e8_cache: /home/kirby/msbench_e8_cache
 
 primary_dataset: msseg2016
 development_dataset: mslesseg   # for debugging pipelines only; not in final tables
@@ -88,6 +92,18 @@ models:
       threshold: 0.5
       batch_size: 64
 
+# Exploratory analyses decided after results were seen; reported separately and labelled as such.
+analysis:
+  iou_filter:
+    label: "post-hoc, decided after seeing E2c results"
+    models: [E2c, E8]
+    rule: drop_masks_below_threshold     # a box whose MedSAM predicted-IoU < t gets an empty mask (still counts in coverage)
+    grid: [0.0, 1.0, 0.025]              # thresholds t (start, stop, step) + "no filter"
+    selection: nested_cv                 # per outer fold: inner CV over its 12 training patients only
+    inner_folds: 4                       # 3 patients each, one per scanner where possible; inner models = same recipe
+    criterion: mean_patient_lesion_f1    # on the inner held-out predictions; ties -> lowest threshold
+    test_sets: not_applied               # CV only
+
 # Each MedSAM condition is fine-tuned separately, with the same box type
 # at training and test time.
 experiments:
@@ -98,6 +114,15 @@ experiments:
   E6:  {analysis: biomarkers, models: [E1, best_medsam]}
   E8:                                         # zoomed_tiles OR small_lesion_loss
     fix: choose_after_E2a_vs_E2c
+    selected: zoomed_tiles                    # rule applied 2026-11-19 to the CV recalls (0.6692 - 0.1504 = 0.5188 >= 0.15)
+    boxes: zoomed                             # = E2c with its tiles zoomed (msbench.medsam.zoom):
+    zoomed_tiles:
+      tiles: same_as_boxes.independent        # same 4 x 4 grid, 25% overlap, inside the brain bounding box
+      tiles_without_brain: skipped            # cannot hold lesions; never cached or predicted
+      crop_to_canvas: keep_aspect_pad_1024    # each tile crop re-embedded alone: longer side -> 1024 px (~4x zoom)
+      prompt: whole_crop
+      brain_box: slice_embedding              # E2c's whole-brain box, unchanged
+      embeddings: {msseg_train: cached (paths.medsam_e8_cache), test_sets: on_the_fly}
     # Decision rule, fixed 2026-11-17 BEFORE any MedSAM training. Inputs:
     # pooled lesion-level recall in the <20 mm^3 bin (detected / reference
     # lesions summed over patients, Anima-port rule, MSSEG consensus), from the

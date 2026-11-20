@@ -3,6 +3,7 @@
 #
 #   scripts/run_E2.sh --exps "E2a E2c"              # E2a folds 0-4, then E2c folds 0-4
 #   scripts/run_E2.sh --exps "E2c E2b"              # E2b starts only if every E2c fold passed
+#   scripts/run_E2.sh --exps E8                     # E8 zoomed tiles (needs scripts/cache_e8_tiles.py)
 #   scripts/run_E2.sh --exps E2a --folds "0 1"
 #   scripts/run_E2.sh --dry-run                     # show the plan, launch nothing
 #   scripts/run_E2.sh --force                       # launch even if the GPU looks busy
@@ -94,6 +95,10 @@ fi
 [ -f "$REPO/experiments/E1/splits_final.json" ] || { echo "missing experiments/E1/splits_final.json" >&2; exit 1; }
 python "$REPO/scripts/cache_medsam_embeddings.py" --dry-run | tail -1 | grep -q "^74 already complete" \
     || { echo "MedSAM embedding cache incomplete; run scripts/cache_medsam_embeddings.py" >&2; exit 1; }
+if [[ " $EXPS " == *" E8 "* ]]; then
+    python "$REPO/scripts/cache_e8_tiles.py" --dry-run | head -1 | grep -q ", 0 to do" \
+        || { echo "E8 zoomed-tile cache incomplete; run scripts/cache_e8_tiles.py" >&2; exit 1; }
+fi
 if job_alive; then echo "an E2 job is already running (pid $(cat "$PIDFILE"))" >&2; exit 1; fi
 echo "E2: exps [$EXPS] folds [$FOLDS] -> $RUNS"
 work=0

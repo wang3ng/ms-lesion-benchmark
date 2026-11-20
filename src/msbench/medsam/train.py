@@ -24,9 +24,11 @@ from msbench.config import load_config, paths
 from msbench.medsam.boxes import box_mask, component_boxes, independent_boxes, jitter_boxes
 from msbench.medsam.model import decode, load_medsam
 from msbench.medsam.slices import SIDE, SliceGeometry, from_canonical, to_canonical
+from msbench.medsam.zoom import encode_tiles, full_box_1024, tile_geometry, zoom_tiles
 
-CONDITIONS = {"E2a": "oracle", "E2b": "nnunet", "E2c": "independent"}
-BOX_KINDS = ("component", "brain", "tile")  # E2a/E2b component boxes; E2c brain box and tiles
+CONDITIONS = {"E2a": "oracle", "E2b": "nnunet", "E2c": "independent", "E8": "zoomed"}
+BOX_KINDS = ("component", "brain", "tile")  # E2a/E2b component boxes; E2c/E8 brain box and tiles
+TILED = ("independent", "zoomed")
 
 
 # ---------------------------------------------------------------- per-case data
@@ -42,13 +44,28 @@ class CaseData:
     ref: np.ndarray | None = None         # canonical reference mask (training cases)
     brain: np.ndarray | None = None       # canonical brain mask
     box_source: np.ndarray | None = None  # canonical mask used for E2b boxes
+    spacing2d: tuple | None = None        # in-plane voxel size (canonical axes 0, 1)
+    tiles: np.ndarray | None = None       # E8: rows (k, z, x0, y0, x1, y1) of the zoomed tiles
+    tile_rows: dict | None = None         # E8: slice index k -> row indices into `tiles`
+    tile_emb_path: Path | None = None     # E8: cached tile embeddings (None -> computed on the fly)
+    case_dir: Path | None = None
     _emb: np.ndarray | None = field(default=None, repr=False)
+    _tile_emb: np.ndarray | None = field(default=None, repr=False)
 
     @property
     def emb(self) -> np.ndarray:
         if self._emb is None:  # opened lazily (per DataLoader worker)
             self._emb = np.load(self.emb_path, mmap_mode="r")
         return self._emb
+
+    @property
+    def tile_emb(self) -> np.ndarray:
+        if self._tile_emb is None:
+            self._tile_emb = np.load(self.tile_emb_path, mmap_mode="r")
+        return self._tile_emb
+
+    def slice_tiles(self, k: int) -> np.ndarray:
+        return self.tiles[self.tile_rows.get(k, []), 2:6].reshape(-1, 4)
 
 
 def _canonical_mask(path: Path, affine: np.ndarray) -> np.ndarray:
@@ -59,7 +76,10 @@ def _canonical_mask(path: Path, affine: np.ndarray) -> np.ndarray:
     return to_canonical(a > 0, affine)
 
 
-def load_case(case_id: str, cfg: dict, with_ref: bool, box_source_dir: Path | None = None) -> CaseData:
+def load_case(case_id: str, cfg: dict, with_ref: bool, box_source_dir: Path | None = None,
+              zoom: bool = False, ref_name: str = "lesion") -> CaseData:
+    """Cached-slice metadata + masks of a case. zoom=True adds the E8 tiles (cached embeddings if the case
+    is in paths.medsam_e8_cache, else tile geometry only and embeddings computed at inference)."""
     p = paths(cfg)
     import pandas as pd
     index = pd.read_csv(p["data_processed"] / "index.csv", dtype=str).set_index("case_id")
@@ -72,12 +92,28 @@ def load_case(case_id: str, cfg: dict, with_ref: bool, box_source_dir: Path | No
     cd = CaseData(case_id, meta_row["dataset"], cache_dir / f"{case_id}.npy", np.asarray(meta["slices"]),
                   SliceGeometry(tuple(g["shape"]), tuple(g["scaled"]), g["px_mm"]), affine,
                   tuple(meta["original_shape"]))
+    cd.case_dir = case_dir
+    cd.spacing2d = tuple(meta["spacing_canonical"][:2])
     bm = case_dir / "brain_mask.nii.gz"
     cd.brain = _canonical_mask(bm if bm.exists() else case_dir / "flair.nii.gz", affine)
     if with_ref:
-        cd.ref = _canonical_mask(case_dir / "lesion.nii.gz", affine)
+        cd.ref = _canonical_mask(case_dir / f"{ref_name}.nii.gz", affine)
     if box_source_dir is not None:
         cd.box_source = _canonical_mask(box_source_dir / f"{case_id}.nii.gz", affine)
+    if zoom:
+        tmeta = p["medsam_e8_cache"] / meta_row["dataset"] / f"{case_id}.json"
+        if tmeta.exists():
+            rows = np.asarray(json.loads(tmeta.read_text())["rows"], dtype=int).reshape(-1, 6)
+            cd.tile_emb_path = tmeta.with_suffix(".npy")
+        else:
+            t = cfg["boxes"]["independent"]["tiles"]
+            rows = np.asarray([(k, int(z), *tl) for k, z in enumerate(cd.slices)
+                               for tl in zoom_tiles(cd.brain[:, :, int(z)], tuple(t["grid"]), float(t["overlap"]))],
+                              dtype=int).reshape(-1, 6)
+        cd.tiles = rows
+        cd.tile_rows = {}
+        for i, k in enumerate(rows[:, 0]):
+            cd.tile_rows.setdefault(int(k), []).append(i)
     return cd
 
 
@@ -89,6 +125,9 @@ def slice_boxes(cd: CaseData, k: int, condition: str, cfg: dict, rng: np.random.
     if condition == "independent":
         t = cfg["boxes"]["independent"]["tiles"]
         return independent_boxes(cd.brain[:, :, z], tuple(t["grid"]), float(t["overlap"]))
+    if condition == "zoomed":  # E2c's brain box + the zoomed tiles of this slice (tiles with brain voxels)
+        brain_box = independent_boxes(cd.brain[:, :, z], (1, 1), 0.0)[:1]
+        return np.vstack([brain_box.reshape(-1, 4), cd.slice_tiles(k).astype(float)])
     src = cd.ref if condition == "oracle" else cd.box_source
     if src is None:
         raise ValueError(f"{cd.case_id}: no mask for {condition} boxes")
@@ -142,9 +181,15 @@ class BoxSampler:
             if self.condition == "nnunet":
                 jit = int(self.cfg["boxes"]["nnunet"]["jitter_px"][1])
                 box = jitter_boxes(box[None], cd.geom.shape, jit, self.rng)[0]
+        kind = 0 if self.condition not in TILED else (1 if bi == 0 else 2)  # box 0 = brain box
+        if self.condition == "zoomed" and bi > 0:  # zoomed tile: own embedding, prompt = whole crop
+            row = cd.tile_rows[k][bi - 1]
+            x0, y0, x1, y1 = (int(v) for v in cd.tiles[row, 2:6])
+            tg = tile_geometry(cd.tiles[row, 2:6], cd.spacing2d)
+            return (np.asarray(cd.tile_emb[row], dtype=np.float32), full_box_1024(tg).astype(np.float32),
+                    tg.mask_to_1024(ref2d[y0:y1, x0:x1]), kind)
         target = cd.geom.mask_to_1024(ref2d & box_mask(box, cd.geom.shape))
         emb = np.asarray(cd.emb[k], dtype=np.float32)
-        kind = 0 if self.condition != "independent" else (1 if bi == 0 else 2)  # box 0 = brain box
         return emb, cd.geom.box_to_1024(box).astype(np.float32), target, kind
 
 
@@ -388,37 +433,98 @@ def train(cases: list[CaseData], condition: str, cfg: dict, run_dir: Path, seed:
 
 
 # ---------------------------------------------------------------- inference
+def iou_levels(cfg: dict) -> np.ndarray:
+    """Predicted-IoU thresholds of the post-hoc filter analysis; level 0 = -inf (no filtering)."""
+    g = cfg["analysis"]["iou_filter"]["grid"]
+    return np.concatenate([[-np.inf], np.round(np.arange(g[0], g[1] + 1e-9, g[2]), 6)])
+
+
+def _slice_image(cd: CaseData) -> np.ndarray:
+    from msbench.medsam.slices import load_volume
+    return load_volume(cd.case_dir).image  # (3, X, Y, Z) canonical, [0, 1]
+
+
 @torch.no_grad()
-def predict_case(model, cd: CaseData, condition: str, cfg: dict, seed: int) -> np.ndarray:
-    """Binary mask on the ORIGINAL voxel grid of the case."""
+def predict(models, cd: CaseData, condition: str, cfg: dict, seed: int, levels: np.ndarray | None = None,
+            encoder=None) -> dict:
+    """Slice-wise prediction with one model or a 5-fold ensemble, on the ORIGINAL voxel grid.
+
+    Per pixel: mean sigmoid over the boxes covering it (per model), averaged over models, > threshold.
+    With `levels` (single model only): also a uint8 volume "levels" = number of predicted-IoU thresholds
+    t_j (levels[j]) at which the voxel stays positive when every box whose predicted IoU < t_j is set to
+    an empty mask (it still counts in the coverage). Monotone, so mask_j = levels_volume > j; level 0
+    (-inf) reproduces the unfiltered mask. E8 tiles use cached embeddings, or `encoder` on the fly.
+    """
+    models = models if isinstance(models, (list, tuple)) else [models]
+    if levels is not None and len(models) != 1:
+        raise ValueError("levels need a single model")
     inf = cfg["models"]["medsam"]["inference"]
+    thr, bs = float(inf["threshold"]), int(inf["batch_size"])
     rng = np.random.default_rng(seed)
     H, W = cd.geom.shape
     pred = np.zeros(cd.brain.shape, dtype=bool)
-    bs = int(inf["batch_size"])
+    lev = np.zeros(cd.brain.shape, dtype=np.uint8) if levels is not None else None
+    t_lev = torch.as_tensor(levels, dtype=torch.float32, device="cuda") if levels is not None else None
+    image = None
+    if condition == "zoomed" and cd.tile_emb_path is None:
+        if encoder is None:
+            raise ValueError(f"{cd.case_id}: no cached tile embeddings; pass the image encoder")
+        image = torch.from_numpy(_slice_image(cd)).cuda()
     for k, z in enumerate(cd.slices):
         boxes = slice_boxes(cd, k, condition, cfg, rng)
         if len(boxes) == 0:
             continue
         emb = torch.from_numpy(np.asarray(cd.emb[k], dtype=np.float32)).cuda()[None]
-        prob_sum = torch.zeros((H, W), device="cuda")
-        cover = torch.zeros((H, W), device="cuda")
-        for i in range(0, len(boxes), bs):
-            bb = boxes[i:i + bs]
-            b1024 = torch.from_numpy(np.stack([cd.geom.box_to_1024(b) for b in bb])).float().cuda()
-            with torch.autocast("cuda", dtype=torch.bfloat16):
-                low = decode(model, emb.expand(len(bb), -1, -1, -1), b1024)
-            prob = torch.sigmoid(cd.geom.logits_from_1024(low.float()))[:, 0]
-            for b, pr in zip(bb, prob):
-                m = torch.from_numpy(box_mask(b, (H, W))).cuda()
-                prob_sum += pr * m
-                cover += m
-        mean = torch.where(cover > 0, prob_sum / cover.clamp(min=1), torch.zeros_like(prob_sum))
-        pred[:, :, z] = (mean > float(inf["threshold"])).cpu().numpy()
-    return from_canonical(pred, cd.affine)
+        masks = torch.from_numpy(np.stack([box_mask(b, (H, W)) for b in boxes])).cuda().float()
+        cover = masks.sum(0)
+        n_slice = len(boxes) if condition != "zoomed" else 1   # boxes decoded on the slice embedding
+        tiles = boxes[1:].astype(int) if condition == "zoomed" else None
+        if condition == "zoomed" and len(tiles):
+            if image is None:
+                temb = torch.from_numpy(np.asarray(cd.tile_emb[cd.tile_rows[k]], dtype=np.float32)).cuda()
+            else:
+                temb = encode_tiles(encoder, image[..., int(z)], tiles, cd.spacing2d).float()
+            tgeo = [tile_geometry(t, cd.spacing2d) for t in tiles]
+            tbox = torch.from_numpy(np.stack([full_box_1024(g) for g in tgeo])).float().cuda()
+        mean = torch.zeros((H, W), device="cuda")
+        for model in models:
+            probs, ious = [], []
+            for i in range(0, n_slice, bs):
+                bb = boxes[i:min(i + bs, n_slice)]
+                b1024 = torch.from_numpy(np.stack([cd.geom.box_to_1024(b) for b in bb])).float().cuda()
+                with torch.autocast("cuda", dtype=torch.bfloat16):
+                    low, iou = decode(model, emb.expand(len(bb), -1, -1, -1), b1024, return_iou=True)
+                probs.append(torch.sigmoid(cd.geom.logits_from_1024(low.float()))[:, 0])
+                ious.append(iou.float())
+            if condition == "zoomed" and len(tiles):
+                for i in range(0, len(tiles), bs):
+                    with torch.autocast("cuda", dtype=torch.bfloat16):
+                        low, iou = decode(model, temb[i:i + bs], tbox[i:i + bs], return_iou=True)
+                    for j, g in enumerate(tgeo[i:i + bs]):
+                        x0, y0, x1, y1 = tiles[i + j]
+                        full = torch.zeros((H, W), device="cuda")
+                        full[y0:y1, x0:x1] = torch.sigmoid(g.logits_from_1024(low[j:j + 1].float()))[0, 0]
+                        probs.append(full[None])
+                    ious.append(iou.float())
+            P = torch.cat(probs) * masks                      # (n, H, W), zero outside each box
+            mean += torch.where(cover > 0, P.sum(0) / cover.clamp(min=1), torch.zeros_like(cover))
+            if levels is not None:
+                keep = (torch.cat(ious)[None, :] >= t_lev[:, None]).float()      # (L, n)
+                lm = torch.einsum("ln,nhw->lhw", keep, P) / cover.clamp(min=1)
+                lev[:, :, z] = ((lm > thr) & (cover > 0)).sum(0).to(torch.uint8).cpu().numpy()
+        pred[:, :, z] = (mean / len(models) > thr).cpu().numpy()
+    out = {"mask": from_canonical(pred, cd.affine)}
+    if lev is not None:
+        out["levels"] = from_canonical(lev, cd.affine)
+    return out
 
 
-def save_prediction(mask: np.ndarray, case_id: str, cfg: dict, out_dir: Path) -> Path:
+def predict_case(model, cd: CaseData, condition: str, cfg: dict, seed: int) -> np.ndarray:
+    """Binary mask on the ORIGINAL voxel grid of the case (one model)."""
+    return predict([model], cd, condition, cfg, seed)["mask"]
+
+
+def save_prediction(mask: np.ndarray, case_id: str, cfg: dict, out_dir: Path, name: str | None = None) -> Path:
     """Write with the FLAIR header of the case (same grid as the reference masks)."""
     import pandas as pd
     p = paths(cfg)
@@ -427,6 +533,6 @@ def save_prediction(mask: np.ndarray, case_id: str, cfg: dict, out_dir: Path) ->
     hdr = ref.header.copy()
     hdr.set_data_dtype(np.uint8)
     out_dir.mkdir(parents=True, exist_ok=True)
-    f = out_dir / f"{case_id}.nii.gz"
+    f = out_dir / f"{name or case_id}.nii.gz"
     nib.save(nib.Nifti1Image(mask.astype(np.uint8), ref.affine, hdr), f)
     return f
