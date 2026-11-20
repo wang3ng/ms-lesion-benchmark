@@ -1,0 +1,6 @@
+scan,model,false-positive lesions,predicted volume (mL)
+msseg_test_c07_p08,E1 nnU-Net,0,0.0
+msseg_test_c07_p08,E2a MedSAM + GT boxes,0,0.0
+msseg_test_c07_p08,E2b MedSAM + E1 boxes,0,0.0
+msseg_test_c07_p08,E2c MedSAM + brain box/tiles,130,1.8899435997009277
+msseg_test_c07_p08,E8 MedSAM + zoomed tiles,47,1.0313653945922852

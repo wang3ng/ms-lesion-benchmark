@@ -262,3 +262,24 @@ def test_anima_empty_conventions():
     assert (none.precision, none.recall, none.f1) == (0.0, 0.0, 0.0)
     fp_only = lesion_detection(ref, empty())
     assert fp_only.precision == 0.0 and math.isnan(fp_only.recall) and fp_only.f1 == 0.0
+
+
+def test_cluster_mean_ci_resamples_patients():
+    """score_test's patient bootstrap: with one scan per patient it equals the plain scan bootstrap."""
+    import importlib.util
+    from pathlib import Path
+    from msbench.stats import bootstrap_ci
+    spec = importlib.util.spec_from_file_location("score_test", Path(__file__).parents[1] / "scripts" / "score_test.py")
+    st = importlib.util.module_from_spec(spec); spec.loader.exec_module(st)
+    rng = np.random.default_rng(1)
+    x = rng.random(12)
+    kw = {"n_boot": 2000, "level": 0.95, "seed": 3}
+    r = st.mean_ci(x, np.arange(12).astype(str), kw)
+    b = bootstrap_ci(x, **kw)
+    assert np.isclose(r["mean"], x.mean()) and np.isclose(r["low"], b["low"]) and np.isclose(r["high"], b["high"])
+    # clustered: 3 patients x 4 scans; every resample keeps whole patients -> only 10 distinct means
+    cl = np.repeat(["a", "b", "c"], 4)
+    s, n = st._agg(x, cl)
+    assert n.tolist() == [4, 4, 4] and np.isclose(s.sum(), x.sum())
+    p = st.paired(x, x - 0.1, cl, kw)
+    assert np.isclose(p["diff"], 0.1) and p["n_patients"] == 3 and np.isclose(p["low"], 0.1)

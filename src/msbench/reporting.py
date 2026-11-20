@@ -33,6 +33,8 @@ SCANNER_LABELS = {
     "ge_discovery_3t": "GE Discovery 3T",
 }
 MAIN_METRICS = ["dice", "lesion_precision", "lesion_recall", "lesion_f1", "fp_lesions"]
+# Fixed per model (categorical palette order; E2b and E8 took slots 4 and 5 when they were added).
+MODEL_COLORS = {"E1": "#2a78d6", "E2a": "#eb6834", "E2c": "#1baf7a", "E2b": "#eda100", "E8": "#e87ba4"}
 
 
 # ---------------------------------------------------------------- text

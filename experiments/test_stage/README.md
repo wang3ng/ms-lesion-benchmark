@@ -1,8 +1,8 @@
-# Test stage — predictions ready, NOT scored
+# Test stage — frozen and scored
 
-Status (2026-11-20): 5-fold-ensemble predictions exist for E1, E2a, E2b, E2c and E8 on the MSSEG 2016 test
-set (38 scans incl. the 8 GE Discovery 3T unseen-scanner exams) and ISBI 2015 (21 labelled scans). **No test
-metric has been computed.** All models, boxes, thresholds, size bins and the E8 choice were fixed from the
+Status (2026-11-20): **experiments frozen, then scored** with `scripts/score_test.py` →
+[`results/test/summary.md`](../../results/test/summary.md) (git tag `results-frozen`). 5-fold-ensemble predictions exist for E1, E2a, E2b, E2c and E8 on the MSSEG 2016 test
+set (38 scans incl. the 8 GE Discovery 3T unseen-scanner exams) and ISBI 2015 (21 labelled scans). All models, boxes, thresholds, size bins and the E8 choice were fixed from the
 MSSEG training cross-validation only.
 
 | Model | Ensemble | Boxes | Files | Location (outside git) |
@@ -21,9 +21,11 @@ Checks (no scoring): every prediction is on the FLAIR grid of its case (shape an
 `msseg_test_c07_p08` (Siemens Aera 1.5T), has an empty consensus mask; E1 predicts nothing there, so E2a
 (boxes from the consensus) and E2b (boxes from E1) are empty by construction.
 
-## Scoring protocol (to run only when asked)
+## Scoring protocol (as run)
 
 - MSSEG test: against the consensus (`lesion`); in-distribution (Siemens/Philips) pooled, GE Discovery
   reported per case.
 - ISBI 2015: each rater separately (`lesion_rater1`, `lesion_rater2`); E2a uses the folder of the same rater.
 - Same Anima-port lesion rule, size bins and statistics as the cross-validation.
+- ISBI: 21 scans of 5 patients — bootstrap CIs resample patients, paired Wilcoxon on per-patient means (n = 5).
+- `msseg_test_c07_p08` (empty consensus): reported by its false-positive lesions, left out of averages and tests.

@@ -66,6 +66,12 @@ results/**
 !results/E2/figures/**
 !results/E2/tables/
 !results/E2/tables/**
+!results/test/
+!results/test/summary.md
+!results/test/figures/
+!results/test/figures/**
+!results/test/tables/
+!results/test/tables/**
 
 # Notebook scratch
 .ipynb_checkpoints/
