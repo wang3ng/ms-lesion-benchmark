@@ -52,7 +52,7 @@ if [ -f "$PIDFILE" ] && grep -q run_E7 "/proc/$(cat "$PIDFILE")/cmdline" 2>/dev/
     echo "E7 job already running (pid $(cat "$PIDFILE"))" >&2; exit 1; fi
 for k in 0 1 2 3 4; do for n in samless_p1 samless_p2 hardnet; do
     e=$([ $n = samless_p1 ] && echo 200 || ([ $n = samless_p2 ] && echo 100 || echo 300))
-    f=$(ls "$RUNS"/results/*_${n}_fold$k/ckpt/net_last_$(printf %05d $((e - 1))).pth 2>/dev/null | tail -1)
+    f=$(ls "$RUNS"/results/*_${n}_fold$k/ckpt/net_last_$(printf %05d $((e - 1))).pth 2>/dev/null | tail -1 || true)
     echo "  ${n}_fold$k: ${f:+done}${f:-to train}"
 done; done
 [ "${1:-}" = "--dry-run" ] && { echo "[dry-run] then predictions, CV scoring and results/E7/summary.md"; exit 0; }
