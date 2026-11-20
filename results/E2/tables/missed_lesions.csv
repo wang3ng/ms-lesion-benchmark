@@ -35,3 +35,12 @@ E2c,siemens_aera_1p5t,>=100,63,27,14
 E2c,philips_ingenia_3t,<20,86,71,69
 E2c,philips_ingenia_3t,20-100,134,81,70
 E2c,philips_ingenia_3t,>=100,68,18,7
+E8,siemens_verio_3t,<20,38,32,32
+E8,siemens_verio_3t,20-100,64,43,43
+E8,siemens_verio_3t,>=100,41,23,12
+E8,siemens_aera_1p5t,<20,9,9,9
+E8,siemens_aera_1p5t,20-100,54,34,33
+E8,siemens_aera_1p5t,>=100,63,23,14
+E8,philips_ingenia_3t,<20,86,67,67
+E8,philips_ingenia_3t,20-100,134,64,59
+E8,philips_ingenia_3t,>=100,68,13,6

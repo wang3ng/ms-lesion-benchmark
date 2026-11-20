@@ -1,8 +1,8 @@
 # E2 cross-validation comparison — E1 nnU-Net vs MedSAM (E2a oracle boxes, E2b E1 boxes, E2c brain box + tiles)
 
-Generated 2026-11-19 18:24 from commit `2390809` by `scripts/e2_summary.py`.
+Generated 2026-11-19 20:02 from commit `6269804` by `scripts/e2_summary.py`.
 
-> **Complete: all 15 MSSEG training patients, each scored by the fold model that did not train on them, for E1, E2a, E2b, E2c.**
+> **Complete: all 15 MSSEG training patients, each scored by the fold model that did not train on them, for E1, E2a, E2b, E2c, E8.**
 
 Same patient-level folds for all models (E1's `splits_final.json`). Lesion rule: Anima-port (6-connected, > 3.0 mm³, α 0.1 / β 0.7 / γ 0.65); reference = MSSEG consensus. MedSAM: frozen image encoder, prompt encoder + mask decoder fine-tuned per condition and fold (10000 steps × 16, same box type at training and validation). **E2a uses the reference to place its boxes and is an upper bound on tracing, not a fair comparison; E2c is the fair head-to-head with E1. E2b refines E1's detections (boxes from E1 out-of-fold predictions), so its lesion recall is bounded by E1's.** No test case is used.
 
@@ -14,48 +14,49 @@ Loss: per-box soft Dice on boxes containing lesion voxels + BCE on every box (`d
 | E2a MedSAM + oracle boxes | 0, 1, 2, 3, 4 | 15 |
 | E2b MedSAM + E1 boxes | 0, 1, 2, 3, 4 | 15 |
 | E2c MedSAM + brain box/tiles | 0, 1, 2, 3, 4 | 15 |
+| E8 MedSAM + zoomed tiles | 0, 1, 2, 3, 4 | 15 |
 
 ## Pooled metrics (15 patients, one value per patient)
 
 Mean ± SD, with the percentile-bootstrap 95% CI of the mean below (10,000 patient resamples). `fp_lesions` = false-positive lesions per scan. Size-bin rows: recall leaves out patients without a reference lesion in the bin; F1 leaves out patients with no lesion of that size in either mask.
 
-| metric | E1 nnU-Net | E2a MedSAM + oracle boxes | E2b MedSAM + E1 boxes | E2c MedSAM + brain box/tiles |
-|---|---|---|---|---|
-| dice | 0.767 ± 0.082<br>[0.727, 0.807] | 0.757 ± 0.032<br>[0.742, 0.773] | 0.683 ± 0.073<br>[0.646, 0.718] | 0.457 ± 0.149<br>[0.384, 0.527] |
-| lesion_precision | 0.734 ± 0.115<br>[0.675, 0.785] | 0.791 ± 0.145<br>[0.718, 0.859] | 0.616 ± 0.135<br>[0.550, 0.681] | 0.193 ± 0.152<br>[0.121, 0.269] |
-| lesion_recall | 0.687 ± 0.183<br>[0.594, 0.774] | 0.905 ± 0.093<br>[0.859, 0.948] | 0.659 ± 0.194<br>[0.556, 0.747] | 0.434 ± 0.150<br>[0.362, 0.509] |
-| lesion_f1 | 0.693 ± 0.133<br>[0.627, 0.757] | 0.840 ± 0.117<br>[0.781, 0.895] | 0.619 ± 0.147<br>[0.542, 0.687] | 0.210 ± 0.103<br>[0.160, 0.259] |
-| fp_lesions | 8.333 ± 4.791<br>[6.000, 10.733] | 12.733 ± 14.577<br>[6.333, 20.467] | 20.000 ± 16.432<br>[12.532, 28.468] | 113.133 ± 38.676<br>[94.398, 132.135] |
-| recall_<20 | 0.322 ± 0.255<br>[0.185, 0.457] (n=12) | 0.572 ± 0.371<br>[0.367, 0.767] (n=12) | 0.278 ± 0.233<br>[0.153, 0.402] (n=12) | 0.076 ± 0.122<br>[0.012, 0.143] (n=12) |
-| recall_20-100 | 0.702 ± 0.224<br>[0.589, 0.809] | 0.962 ± 0.063<br>[0.928, 0.990] | 0.666 ± 0.255<br>[0.531, 0.781] | 0.395 ± 0.179<br>[0.308, 0.484] |
-| recall_>=100 | 0.867 ± 0.153<br>[0.787, 0.937] | 0.994 ± 0.022<br>[0.983, 1.000] | 0.874 ± 0.137<br>[0.805, 0.938] | 0.719 ± 0.205<br>[0.616, 0.816] |
-| f1_<20 | 0.261 ± 0.258<br>[0.139, 0.389] | 0.410 ± 0.359<br>[0.237, 0.583] | 0.237 ± 0.223<br>[0.127, 0.350] (n=14) | 0.039 ± 0.069<br>[0.008, 0.074] |
-| f1_20-100 | 0.708 ± 0.181<br>[0.618, 0.795] | 0.950 ± 0.055<br>[0.921, 0.975] | 0.665 ± 0.227<br>[0.540, 0.763] | 0.279 ± 0.148<br>[0.205, 0.350] |
-| f1_>=100 | 0.886 ± 0.112<br>[0.827, 0.935] | 0.995 ± 0.014<br>[0.987, 1.000] | 0.869 ± 0.105<br>[0.818, 0.918] | 0.721 ± 0.209<br>[0.618, 0.822] |
+| metric | E1 nnU-Net | E2a MedSAM + oracle boxes | E2b MedSAM + E1 boxes | E2c MedSAM + brain box/tiles | E8 MedSAM + zoomed tiles |
+|---|---|---|---|---|---|
+| dice | 0.767 ± 0.082<br>[0.727, 0.807] | 0.757 ± 0.032<br>[0.742, 0.773] | 0.683 ± 0.073<br>[0.646, 0.718] | 0.457 ± 0.149<br>[0.384, 0.527] | 0.513 ± 0.152<br>[0.439, 0.585] |
+| lesion_precision | 0.734 ± 0.115<br>[0.675, 0.785] | 0.791 ± 0.145<br>[0.718, 0.859] | 0.616 ± 0.135<br>[0.550, 0.681] | 0.193 ± 0.152<br>[0.121, 0.269] | 0.283 ± 0.169<br>[0.200, 0.364] |
+| lesion_recall | 0.687 ± 0.183<br>[0.594, 0.774] | 0.905 ± 0.093<br>[0.859, 0.948] | 0.659 ± 0.194<br>[0.556, 0.747] | 0.434 ± 0.150<br>[0.362, 0.509] | 0.502 ± 0.182<br>[0.410, 0.588] |
+| lesion_f1 | 0.693 ± 0.133<br>[0.627, 0.757] | 0.840 ± 0.117<br>[0.781, 0.895] | 0.619 ± 0.147<br>[0.542, 0.687] | 0.210 ± 0.103<br>[0.160, 0.259] | 0.296 ± 0.127<br>[0.235, 0.357] |
+| fp_lesions | 8.333 ± 4.791<br>[6.000, 10.733] | 12.733 ± 14.577<br>[6.333, 20.467] | 20.000 ± 16.432<br>[12.532, 28.468] | 113.133 ± 38.676<br>[94.398, 132.135] | 62.867 ± 25.368<br>[51.132, 75.933] |
+| recall_<20 | 0.322 ± 0.255<br>[0.185, 0.457] (n=12) | 0.572 ± 0.371<br>[0.367, 0.767] (n=12) | 0.278 ± 0.233<br>[0.153, 0.402] (n=12) | 0.076 ± 0.122<br>[0.012, 0.143] (n=12) | 0.123 ± 0.152<br>[0.046, 0.210] (n=12) |
+| recall_20-100 | 0.702 ± 0.224<br>[0.589, 0.809] | 0.962 ± 0.063<br>[0.928, 0.990] | 0.666 ± 0.255<br>[0.531, 0.781] | 0.395 ± 0.179<br>[0.308, 0.484] | 0.518 ± 0.232<br>[0.408, 0.634] |
+| recall_>=100 | 0.867 ± 0.153<br>[0.787, 0.937] | 0.994 ± 0.022<br>[0.983, 1.000] | 0.874 ± 0.137<br>[0.805, 0.938] | 0.719 ± 0.205<br>[0.616, 0.816] | 0.729 ± 0.264<br>[0.594, 0.852] |
+| f1_<20 | 0.261 ± 0.258<br>[0.139, 0.389] | 0.410 ± 0.359<br>[0.237, 0.583] | 0.237 ± 0.223<br>[0.127, 0.350] (n=14) | 0.039 ± 0.069<br>[0.008, 0.074] | 0.089 ± 0.119<br>[0.036, 0.149] |
+| f1_20-100 | 0.708 ± 0.181<br>[0.618, 0.795] | 0.950 ± 0.055<br>[0.921, 0.975] | 0.665 ± 0.227<br>[0.540, 0.763] | 0.279 ± 0.148<br>[0.205, 0.350] | 0.387 ± 0.160<br>[0.309, 0.464] |
+| f1_>=100 | 0.886 ± 0.112<br>[0.827, 0.935] | 0.995 ± 0.014<br>[0.987, 1.000] | 0.869 ± 0.105<br>[0.818, 0.918] | 0.721 ± 0.209<br>[0.618, 0.822] | 0.653 ± 0.295<br>[0.505, 0.790] |
 
 ## Lesion-level recall by size bin (pooled lesions)
 
 Detected / reference lesions summed over patients (95% CI: cluster bootstrap over patients).
 
-| bin (mm³) | E1 nnU-Net | E2a MedSAM + oracle boxes | E2b MedSAM + E1 boxes | E2c MedSAM + brain box/tiles |
-|---|---|---|---|---|
-| <20 | 63/133 = 0.474<br>[0.281, 0.586] | 89/133 = 0.669<br>[0.480, 0.821] | 54/133 = 0.406<br>[0.226, 0.533] | 20/133 = 0.150<br>[0.042, 0.231] |
-| 20-100 | 180/252 = 0.714<br>[0.605, 0.797] | 243/252 = 0.964<br>[0.933, 0.987] | 176/252 = 0.698<br>[0.592, 0.777] | 88/252 = 0.349<br>[0.277, 0.429] |
-| >=100 | 149/172 = 0.866<br>[0.780, 0.939] | 171/172 = 0.994<br>[0.980, 1.000] | 149/172 = 0.866<br>[0.791, 0.935] | 115/172 = 0.669<br>[0.551, 0.778] |
+| bin (mm³) | E1 nnU-Net | E2a MedSAM + oracle boxes | E2b MedSAM + E1 boxes | E2c MedSAM + brain box/tiles | E8 MedSAM + zoomed tiles |
+|---|---|---|---|---|---|
+| <20 | 63/133 = 0.474<br>[0.281, 0.586] | 89/133 = 0.669<br>[0.480, 0.821] | 54/133 = 0.406<br>[0.226, 0.533] | 20/133 = 0.150<br>[0.042, 0.231] | 25/133 = 0.188<br>[0.085, 0.282] |
+| 20-100 | 180/252 = 0.714<br>[0.605, 0.797] | 243/252 = 0.964<br>[0.933, 0.987] | 176/252 = 0.698<br>[0.592, 0.777] | 88/252 = 0.349<br>[0.277, 0.429] | 111/252 = 0.440<br>[0.348, 0.540] |
+| >=100 | 149/172 = 0.866<br>[0.780, 0.939] | 171/172 = 0.994<br>[0.980, 1.000] | 149/172 = 0.866<br>[0.791, 0.935] | 115/172 = 0.669<br>[0.551, 0.778] | 113/172 = 0.657<br>[0.500, 0.803] |
 
 Per scanner (detected / reference, recall):
 
-| scanner | bin (mm³) | E1 | E2a | E2b | E2c |
-|---|---|---|---|---|---|
-| Siemens Verio 3T | <20 | 10/38 (0.26) | 20/38 (0.53) | 8/38 (0.21) | 5/38 (0.13) |
-| Siemens Verio 3T | 20-100 | 44/64 (0.69) | 62/64 (0.97) | 42/64 (0.66) | 17/64 (0.27) |
-| Siemens Verio 3T | >=100 | 30/41 (0.73) | 40/41 (0.98) | 32/41 (0.78) | 29/41 (0.71) |
-| Siemens Aera 1.5T | <20 | 2/9 (0.22) | 1/9 (0.11) | 1/9 (0.11) | 0/9 (0.00) |
-| Siemens Aera 1.5T | 20-100 | 30/54 (0.56) | 50/54 (0.93) | 30/54 (0.56) | 18/54 (0.33) |
-| Siemens Aera 1.5T | >=100 | 55/63 (0.87) | 63/63 (1.00) | 54/63 (0.86) | 36/63 (0.57) |
-| Philips Ingenia 3T | <20 | 51/86 (0.59) | 68/86 (0.79) | 45/86 (0.52) | 15/86 (0.17) |
-| Philips Ingenia 3T | 20-100 | 106/134 (0.79) | 131/134 (0.98) | 104/134 (0.78) | 53/134 (0.40) |
-| Philips Ingenia 3T | >=100 | 64/68 (0.94) | 68/68 (1.00) | 63/68 (0.93) | 50/68 (0.74) |
+| scanner | bin (mm³) | E1 | E2a | E2b | E2c | E8 |
+|---|---|---|---|---|---|---|
+| Siemens Verio 3T | <20 | 10/38 (0.26) | 20/38 (0.53) | 8/38 (0.21) | 5/38 (0.13) | 6/38 (0.16) |
+| Siemens Verio 3T | 20-100 | 44/64 (0.69) | 62/64 (0.97) | 42/64 (0.66) | 17/64 (0.27) | 21/64 (0.33) |
+| Siemens Verio 3T | >=100 | 30/41 (0.73) | 40/41 (0.98) | 32/41 (0.78) | 29/41 (0.71) | 18/41 (0.44) |
+| Siemens Aera 1.5T | <20 | 2/9 (0.22) | 1/9 (0.11) | 1/9 (0.11) | 0/9 (0.00) | 0/9 (0.00) |
+| Siemens Aera 1.5T | 20-100 | 30/54 (0.56) | 50/54 (0.93) | 30/54 (0.56) | 18/54 (0.33) | 20/54 (0.37) |
+| Siemens Aera 1.5T | >=100 | 55/63 (0.87) | 63/63 (1.00) | 54/63 (0.86) | 36/63 (0.57) | 40/63 (0.63) |
+| Philips Ingenia 3T | <20 | 51/86 (0.59) | 68/86 (0.79) | 45/86 (0.52) | 15/86 (0.17) | 19/86 (0.22) |
+| Philips Ingenia 3T | 20-100 | 106/134 (0.79) | 131/134 (0.98) | 104/134 (0.78) | 53/134 (0.40) | 70/134 (0.52) |
+| Philips Ingenia 3T | >=100 | 64/68 (0.94) | 68/68 (1.00) | 63/68 (0.93) | 50/68 (0.74) | 55/68 (0.81) |
 
 ![recall_by_size_bin](figures/recall_by_size_bin.png)
 
@@ -69,18 +70,33 @@ Scanner columns: FP lesions per scan for that scanner. Bin columns: FP lesion co
 | E2a MedSAM + oracle boxes | 191 | 12.7 | 15.6 | 12.8 | 9.8 | 176 | 14 | 1 | 92% |
 | E2b MedSAM + E1 boxes | 300 | 20.0 | 20.0 | 17.2 | 22.8 | 227 | 57 | 16 | 76% |
 | E2c MedSAM + brain box/tiles | 1697 | 113.1 | 110.6 | 136.6 | 92.2 | 1423 | 253 | 21 | 84% |
+| E8 MedSAM + zoomed tiles | 943 | 62.9 | 47.8 | 83.2 | 57.6 | 750 | 174 | 19 | 80% |
 
 ![fp_volume_hist](figures/fp_volume_hist.png)
+
+## Recall and false positives by size bin
+
+Recall: pooled detected / reference lesions in the bin. FP / scan: false-positive lesions whose own volume falls in the bin, per scan.
+
+| model | recall <20 | FP/scan <20 | recall 20-100 | FP/scan 20-100 | recall >=100 | FP/scan >=100 |
+|---|---|---|---|---|---|---|
+| E1 nnU-Net | 0.474 | 5.5 | 0.714 | 2.1 | 0.866 | 0.7 |
+| E2a MedSAM + oracle boxes | 0.669 | 11.7 | 0.964 | 0.9 | 0.994 | 0.1 |
+| E2b MedSAM + E1 boxes | 0.406 | 15.1 | 0.698 | 3.8 | 0.866 | 1.1 |
+| E2c MedSAM + brain box/tiles | 0.150 | 94.9 | 0.349 | 16.9 | 0.669 | 1.4 |
+| E8 MedSAM + zoomed tiles | 0.188 | 50.0 | 0.440 | 11.6 | 0.657 | 1.3 |
+
+![fp_per_scan_by_size_bin](figures/fp_per_scan_by_size_bin.png)
 
 ## Missed lesions
 
 Missed / reference lesions; in brackets, missed lesions with no predicted voxel at all.
 
-| bin (mm³) | E1 nnU-Net | E2a MedSAM + oracle boxes | E2b MedSAM + E1 boxes | E2c MedSAM + brain box/tiles |
-|---|---|---|---|---|
-| <20 | 70 / 133 (no voxel: 67) | 44 / 133 (no voxel: 32) | 79 / 133 (no voxel: 73) | 113 / 133 (no voxel: 109) |
-| 20-100 | 72 / 252 (no voxel: 69) | 9 / 252 (no voxel: 3) | 76 / 252 (no voxel: 66) | 164 / 252 (no voxel: 147) |
-| >=100 | 23 / 172 (no voxel: 17) | 1 / 172 (no voxel: 0) | 23 / 172 (no voxel: 17) | 57 / 172 (no voxel: 32) |
+| bin (mm³) | E1 nnU-Net | E2a MedSAM + oracle boxes | E2b MedSAM + E1 boxes | E2c MedSAM + brain box/tiles | E8 MedSAM + zoomed tiles |
+|---|---|---|---|---|---|
+| <20 | 70 / 133 (no voxel: 67) | 44 / 133 (no voxel: 32) | 79 / 133 (no voxel: 73) | 113 / 133 (no voxel: 109) | 108 / 133 (no voxel: 108) |
+| 20-100 | 72 / 252 (no voxel: 69) | 9 / 252 (no voxel: 3) | 76 / 252 (no voxel: 66) | 164 / 252 (no voxel: 147) | 141 / 252 (no voxel: 135) |
+| >=100 | 23 / 172 (no voxel: 17) | 1 / 172 (no voxel: 0) | 23 / 172 (no voxel: 17) | 57 / 172 (no voxel: 32) | 59 / 172 (no voxel: 32) |
 
 ![missed_lesions](figures/missed_lesions.png)
 
@@ -145,6 +161,44 @@ Per-patient metrics: mean difference (A − B) with paired bootstrap 95% CI (pat
 | pooled recall 20-100 | 15 | 0.698 | 0.714 | -0.016 | [-0.038, 0.000] | – | – | – |
 | pooled recall >=100 | 15 | 0.866 | 0.866 | 0.000 | [-0.028, 0.031] | – | – | – |
 
+### E8 MedSAM + zoomed tiles − E2c MedSAM + brain box/tiles
+
+| metric | n | mean E8 | mean E2c | mean diff | 95% CI | median diff | Wilcoxon p | p (Holm) |
+|---|---|---|---|---|---|---|---|---|
+| dice | 15 | 0.513 | 0.457 | 0.056 | [0.024, 0.087] | 0.051 | 0.003 | 0.030 |
+| lesion_precision | 15 | 0.283 | 0.193 | 0.091 | [0.038, 0.142] | 0.080 | 0.007 | 0.047 |
+| lesion_recall | 15 | 0.502 | 0.434 | 0.067 | [0.017, 0.118] | 0.043 | 0.033 | 0.164 |
+| lesion_f1 | 15 | 0.296 | 0.210 | 0.086 | [0.049, 0.126] | 0.062 | 0.001 | 0.009 |
+| fp_lesions | 15 | 62.867 | 113.133 | -50.267 | [-67.533, -32.733] | -40.000 | 0.000 | 0.003 |
+| recall_<20 | 12 | 0.123 | 0.076 | 0.047 | [-0.001, 0.119] | 0.000 | 0.125 | 0.375 |
+| recall_20-100 | 15 | 0.518 | 0.395 | 0.123 | [0.057, 0.199] | 0.133 | 0.008 | 0.047 |
+| recall_>=100 | 15 | 0.729 | 0.719 | 0.010 | [-0.093, 0.107] | 0.000 | 0.813 | 0.813 |
+| f1_<20 | 15 | 0.089 | 0.039 | 0.050 | [0.013, 0.093] | 0.000 | 0.043 | 0.170 |
+| f1_20-100 | 15 | 0.387 | 0.279 | 0.108 | [0.045, 0.167] | 0.098 | 0.004 | 0.034 |
+| f1_>=100 | 15 | 0.653 | 0.721 | -0.068 | [-0.178, 0.026] | -0.059 | 0.239 | 0.479 |
+| pooled recall <20 | 15 | 0.188 | 0.150 | 0.038 | [0.000, 0.090] | – | – | – |
+| pooled recall 20-100 | 15 | 0.440 | 0.349 | 0.091 | [0.038, 0.150] | – | – | – |
+| pooled recall >=100 | 15 | 0.657 | 0.669 | -0.012 | [-0.126, 0.099] | – | – | – |
+
+### E8 MedSAM + zoomed tiles − E1 nnU-Net
+
+| metric | n | mean E8 | mean E1 | mean diff | 95% CI | median diff | Wilcoxon p | p (Holm) |
+|---|---|---|---|---|---|---|---|---|
+| dice | 15 | 0.513 | 0.767 | -0.254 | [-0.297, -0.212] | -0.238 | 0.000 | 0.001 |
+| lesion_precision | 15 | 0.283 | 0.734 | -0.450 | [-0.534, -0.370] | -0.448 | 0.000 | 0.001 |
+| lesion_recall | 15 | 0.502 | 0.687 | -0.186 | [-0.270, -0.097] | -0.176 | 0.005 | 0.027 |
+| lesion_f1 | 15 | 0.296 | 0.693 | -0.398 | [-0.477, -0.316] | -0.406 | 0.000 | 0.001 |
+| fp_lesions | 15 | 62.867 | 8.333 | 54.533 | [42.533, 67.733] | 52.000 | 0.000 | 0.001 |
+| recall_<20 | 12 | 0.123 | 0.322 | -0.199 | [-0.302, -0.097] | -0.219 | 0.016 | 0.047 |
+| recall_20-100 | 15 | 0.518 | 0.702 | -0.184 | [-0.294, -0.065] | -0.200 | 0.016 | 0.047 |
+| recall_>=100 | 15 | 0.729 | 0.867 | -0.138 | [-0.262, -0.024] | -0.083 | 0.037 | 0.047 |
+| f1_<20 | 15 | 0.089 | 0.261 | -0.172 | [-0.267, -0.082] | -0.051 | 0.008 | 0.031 |
+| f1_20-100 | 15 | 0.387 | 0.708 | -0.321 | [-0.401, -0.234] | -0.319 | 0.000 | 0.001 |
+| f1_>=100 | 15 | 0.653 | 0.886 | -0.232 | [-0.347, -0.125] | -0.166 | 0.002 | 0.014 |
+| pooled recall <20 | 15 | 0.188 | 0.474 | -0.286 | [-0.389, -0.151] | – | – | – |
+| pooled recall 20-100 | 15 | 0.440 | 0.714 | -0.274 | [-0.370, -0.155] | – | – | – |
+| pooled recall >=100 | 15 | 0.657 | 0.866 | -0.209 | [-0.337, -0.083] | – | – | – |
+
 ## E8 decision rule
 
 Rule fixed in `configs/experiment.yaml` before any MedSAM training (metric `pooled_recall_lt20_cv`: pooled lesion-level recall in the <20 mm³ bin over the cross-validation patients; no test data).
@@ -173,6 +227,11 @@ Logged on the training batches of each fold: lesion-box loss vs its value over s
 | E2b | 2 | 8 | 10000 | passed | 0.447 | 0.496 | 0.360 | 1.000 | 0.999 | – | – | 0.931 |
 | E2b | 3 | 8 | 10000 | passed | 0.440 | 0.555 | 0.395 | 0.999 | 0.998 | – | – | 0.946 |
 | E2b | 4 | 8 | 10000 | passed | 0.430 | 0.586 | 0.419 | 0.998 | 0.996 | – | – | 0.946 |
+| E8 | 0 | 8 | 10000 | passed | 1.706 | 0.267 | 0.184 | 0.995 | 0.998 | 1.000 | 0.997 | 0.719 |
+| E8 | 1 | 8 | 10000 | passed | 1.724 | 0.267 | 0.176 | 0.995 | 0.996 | 1.000 | 0.996 | 0.698 |
+| E8 | 2 | 8 | 10000 | passed | 1.765 | 0.263 | 0.160 | 0.996 | 0.996 | 0.990 | 0.997 | 0.712 |
+| E8 | 3 | 8 | 10000 | passed | 1.707 | 0.262 | 0.179 | 0.999 | 0.996 | 1.000 | 0.996 | 0.671 |
+| E8 | 4 | 8 | 10000 | passed | 1.693 | 0.257 | 0.180 | 0.999 | 0.998 | 0.978 | 1.000 | 0.722 |
 
 Box diagnostics, E2c MedSAM + brain box/tiles (final checkpoint, 4 training patients per fold, `scripts/medsam_box_diagnostics.py`):
 
@@ -194,25 +253,31 @@ Box diagnostics, E2b MedSAM + E1 boxes (final checkpoint, 4 training patients pe
 | E2b | 3 | 4 | 0.999 | 0.937 | 0.777 | 11843.750 |
 | E2b | 4 | 4 | 0.998 | 0.918 | 0.790 | 10999.750 |
 
+## Exploratory: predicted-IoU mask filter (post-hoc, decided after seeing E2c results)
+
+> **Post hoc, decided after seeing E2c results; exploratory, not part of the pre-specified comparison.** A box whose MedSAM predicted-IoU score is below a threshold t gets an empty mask (it still counts in the per-pixel coverage). t is chosen per outer fold by nested cross-validation inside that fold's 12 training patients (4 inner folds, inner models trained with the same recipe; criterion: mean per-patient lesion F1 on the inner held-out patients, ties to the lowest t), then applied to the fold's validation patients, which are never used to choose it (`scripts/iou_filter_analysis.py`). Not applied to any test set.
+
+_IoU-filter results not available yet._
+
 ## Per-patient results
 
-| fold | case_id | scanner | n_ref_lesions | dice E1 | dice E2a | dice E2b | dice E2c | lesion_f1 E1 | lesion_f1 E2a | lesion_f1 E2b | lesion_f1 E2c | fp_lesions E1 | fp_lesions E2a | fp_lesions E2b | fp_lesions E2c |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 2 | msseg_train_c01_p01 | siemens_verio_3t | 44 | 0.884 | 0.749 | 0.772 | 0.573 | 0.412 | 0.670 | 0.353 | 0.240 | 7 | 33 | 26 | 68 |
-| 4 | msseg_train_c01_p02 | siemens_verio_3t | 28 | 0.675 | 0.755 | 0.653 | 0.539 | 0.688 | 0.861 | 0.583 | 0.207 | 6 | 10 | 14 | 104 |
-| 3 | msseg_train_c01_p03 | siemens_verio_3t | 59 | 0.900 | 0.805 | 0.793 | 0.715 | 0.810 | 0.758 | 0.588 | 0.198 | 9 | 27 | 51 | 146 |
-| 1 | msseg_train_c01_p04 | siemens_verio_3t | 7 | 0.710 | 0.745 | 0.636 | 0.339 | 0.769 | 1.000 | 0.769 | 0.061 | 1 | 0 | 1 | 89 |
-| 0 | msseg_train_c01_p05 | siemens_verio_3t | 5 | 0.810 | 0.814 | 0.754 | 0.563 | 0.533 | 0.656 | 0.308 | 0.208 | 2 | 8 | 8 | 146 |
-| 3 | msseg_train_c07_p01 | siemens_aera_1p5t | 18 | 0.626 | 0.718 | 0.528 | 0.214 | 0.538 | 0.950 | 0.667 | 0.054 | 5 | 2 | 4 | 166 |
-| 2 | msseg_train_c07_p02 | siemens_aera_1p5t | 53 | 0.788 | 0.733 | 0.702 | 0.459 | 0.641 | 0.611 | 0.482 | 0.308 | 10 | 53 | 50 | 75 |
-| 0 | msseg_train_c07_p03 | siemens_aera_1p5t | 14 | 0.662 | 0.733 | 0.586 | 0.301 | 0.594 | 0.870 | 0.581 | 0.121 | 12 | 2 | 14 | 182 |
-| 4 | msseg_train_c07_p04 | siemens_aera_1p5t | 24 | 0.743 | 0.753 | 0.669 | 0.306 | 0.905 | 0.931 | 0.842 | 0.151 | 4 | 4 | 8 | 138 |
-| 1 | msseg_train_c07_p05 | siemens_aera_1p5t | 17 | 0.770 | 0.802 | 0.720 | 0.388 | 0.806 | 0.919 | 0.699 | 0.136 | 4 | 3 | 10 | 122 |
-| 0 | msseg_train_c08_p01 | philips_ingenia_3t | 85 | 0.785 | 0.757 | 0.694 | 0.567 | 0.792 | 0.948 | 0.754 | 0.332 | 9 | 9 | 15 | 110 |
-| 4 | msseg_train_c08_p02 | philips_ingenia_3t | 27 | 0.683 | 0.701 | 0.593 | 0.252 | 0.648 | 0.807 | 0.624 | 0.128 | 10 | 5 | 12 | 140 |
-| 2 | msseg_train_c08_p03 | philips_ingenia_3t | 33 | 0.842 | 0.754 | 0.728 | 0.473 | 0.756 | 0.854 | 0.691 | 0.310 | 14 | 14 | 25 | 61 |
-| 3 | msseg_train_c08_p04 | philips_ingenia_3t | 47 | 0.824 | 0.763 | 0.705 | 0.566 | 0.701 | 0.870 | 0.630 | 0.304 | 15 | 5 | 16 | 71 |
-| 1 | msseg_train_c08_p05 | philips_ingenia_3t | 96 | 0.805 | 0.780 | 0.716 | 0.602 | 0.809 | 0.900 | 0.709 | 0.392 | 17 | 16 | 46 | 79 |
+| fold | case_id | scanner | n_ref_lesions | dice E1 | dice E2a | dice E2b | dice E2c | dice E8 | lesion_f1 E1 | lesion_f1 E2a | lesion_f1 E2b | lesion_f1 E2c | lesion_f1 E8 | fp_lesions E1 | fp_lesions E2a | fp_lesions E2b | fp_lesions E2c | fp_lesions E8 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2 | msseg_train_c01_p01 | siemens_verio_3t | 44 | 0.884 | 0.749 | 0.772 | 0.573 | 0.574 | 0.412 | 0.670 | 0.353 | 0.240 | 0.268 | 7 | 33 | 26 | 68 | 35 |
+| 4 | msseg_train_c01_p02 | siemens_verio_3t | 28 | 0.675 | 0.755 | 0.653 | 0.539 | 0.438 | 0.688 | 0.861 | 0.583 | 0.207 | 0.343 | 6 | 10 | 14 | 104 | 67 |
+| 3 | msseg_train_c01_p03 | siemens_verio_3t | 59 | 0.900 | 0.805 | 0.793 | 0.715 | 0.759 | 0.810 | 0.758 | 0.588 | 0.198 | 0.324 | 9 | 27 | 51 | 146 | 41 |
+| 1 | msseg_train_c01_p04 | siemens_verio_3t | 7 | 0.710 | 0.745 | 0.636 | 0.339 | 0.467 | 0.769 | 1.000 | 0.769 | 0.061 | 0.123 | 1 | 0 | 1 | 89 | 54 |
+| 0 | msseg_train_c01_p05 | siemens_verio_3t | 5 | 0.810 | 0.814 | 0.754 | 0.563 | 0.616 | 0.533 | 0.656 | 0.308 | 0.208 | 0.460 | 2 | 8 | 8 | 146 | 42 |
+| 3 | msseg_train_c07_p01 | siemens_aera_1p5t | 18 | 0.626 | 0.718 | 0.528 | 0.214 | 0.220 | 0.538 | 0.950 | 0.667 | 0.054 | 0.091 | 5 | 2 | 4 | 166 | 77 |
+| 2 | msseg_train_c07_p02 | siemens_aera_1p5t | 53 | 0.788 | 0.733 | 0.702 | 0.459 | 0.501 | 0.641 | 0.611 | 0.482 | 0.308 | 0.261 | 10 | 53 | 50 | 75 | 41 |
+| 0 | msseg_train_c07_p03 | siemens_aera_1p5t | 14 | 0.662 | 0.733 | 0.586 | 0.301 | 0.386 | 0.594 | 0.870 | 0.581 | 0.121 | 0.160 | 12 | 2 | 14 | 182 | 111 |
+| 4 | msseg_train_c07_p04 | siemens_aera_1p5t | 24 | 0.743 | 0.753 | 0.669 | 0.306 | 0.384 | 0.905 | 0.931 | 0.842 | 0.151 | 0.308 | 4 | 4 | 8 | 138 | 73 |
+| 1 | msseg_train_c07_p05 | siemens_aera_1p5t | 17 | 0.770 | 0.802 | 0.720 | 0.388 | 0.532 | 0.806 | 0.919 | 0.699 | 0.136 | 0.166 | 4 | 3 | 10 | 122 | 114 |
+| 0 | msseg_train_c08_p01 | philips_ingenia_3t | 85 | 0.785 | 0.757 | 0.694 | 0.567 | 0.674 | 0.792 | 0.948 | 0.754 | 0.332 | 0.505 | 9 | 9 | 15 | 110 | 50 |
+| 4 | msseg_train_c08_p02 | philips_ingenia_3t | 27 | 0.683 | 0.701 | 0.593 | 0.252 | 0.277 | 0.648 | 0.807 | 0.624 | 0.128 | 0.222 | 10 | 5 | 12 | 140 | 62 |
+| 2 | msseg_train_c08_p03 | philips_ingenia_3t | 33 | 0.842 | 0.754 | 0.728 | 0.473 | 0.614 | 0.756 | 0.854 | 0.691 | 0.310 | 0.371 | 14 | 14 | 25 | 61 | 81 |
+| 3 | msseg_train_c08_p04 | philips_ingenia_3t | 47 | 0.824 | 0.763 | 0.705 | 0.566 | 0.617 | 0.701 | 0.870 | 0.630 | 0.304 | 0.434 | 15 | 5 | 16 | 71 | 31 |
+| 1 | msseg_train_c08_p05 | philips_ingenia_3t | 96 | 0.805 | 0.780 | 0.716 | 0.602 | 0.645 | 0.809 | 0.900 | 0.709 | 0.392 | 0.402 | 17 | 16 | 46 | 79 | 64 |
 
 ## Appendix — first E2c run (collapsed; documented failure)
 
