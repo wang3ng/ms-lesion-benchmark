@@ -75,3 +75,6 @@ results/**
 
 # Notebook scratch
 .ipynb_checkpoints/
+
+# Third-party code (cloned; upstream commit recorded in experiments/E7/README.md)
+third_party/

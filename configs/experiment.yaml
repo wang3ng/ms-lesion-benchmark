@@ -18,6 +18,10 @@ paths:
   # the lab RTX 4090 box (the data HDD is too slow for random reads), mode 700. DELETE after the project
   # (TODO.md). Test-set tile embeddings are never cached (computed on the fly).
   medsam_e8_cache: /home/kirby/msbench_e8_cache
+  # E7 (exploratory, after the results freeze): MS-SAM-LESS runs and verified pretrained weights
+  e7_runs: ../e7_runs
+  sam_vit_b: ../models/e7_downloads/sam_vit_b_01ec64.pth        # Meta SAM ViT-B; md5 01ec64d2..., sha256 ec2df627...
+  hardnet85: ../models/e7_downloads/hardnet85-a28faa00.pth      # HarDNet-85 ImageNet (ping-chao.com); sha256 a28faa00...
 
 primary_dataset: msseg2016
 development_dataset: mslesseg   # for debugging pipelines only; not in final tables
@@ -91,6 +95,32 @@ models:
       combine: mean_prob_over_covering_boxes   # per pixel: mean sigmoid over the boxes that cover it
       threshold: 0.5
       batch_size: 64
+
+# E7 — EXPLORATORY, added after the results freeze (branch e7-ms-sam-less). MS-SAM-LESS
+# (Proietto Salanitri et al., Pattern Recognit. Lett. 2026; github.com/perceivelab/MS-SAM-LESS @ dde835c)
+# and its HarDNet Segmentor baseline, trained on E1's 5 folds and scored with our scripts. Published
+# hyperparameters (README commands) except the deviations listed, approved 2026-11-20.
+e7:
+  upstream_commit: dde835c95aa2978030830515cace8479bc0a8eac
+  common: {optim: SGD, lr: 0.01, momentum: 0.0, weight_decay: 1.0e-4, batch_size: 8, acc_steps: 2,
+           criterion: dice_ce, out_channels: 2, hardnet_order: 85, threshold: 0.5, amp: true, seed: 42,
+           axcodes: RAS, num_slices: 1}
+  phase1: {epochs: 200, sam: sam_vit_b, image_dim: 1024, prompt_learner_input: 512, pos_rand_crop: 0.85, neg_rand_crop: 0.15}
+  phase2: {epochs: 100, image_dim: 512, segmentor: ConvUpsample, finetune_backbone: true, init: phase1_last,
+           pos_rand_crop: 0.75, neg_rand_crop: 0.25}          # their phase-2 command uses the defaults
+  hardnet_baseline: {epochs: 300, image_dim: 512, segmentor: ConvUpsample, finetune_backbone: true, init: imagenet,
+                     pos_rand_crop: 0.75, neg_rand_crop: 0.25}
+  deviations:
+    inputs: "FLAIR/T1/T2 stacked as 3 channels, each z-scored and scaled to [0,1] (paper: FLAIR only); SAM and HarDNet keep their 3-channel first layers"
+    repeats_per_epoch: 8              # each training scan 8x per epoch (12 scans/fold -> 12 updates/epoch; ~2,400 phase-1 updates), to roughly match their MSLesSeg setup
+    checkpoint: last_epoch            # no selection on validation patients (paper: best validation IoU), as E1/E2
+    per_epoch_validation: none
+    hardnet_baseline_epochs: "phase1 + phase2 = 300 epochs at x8, so the comparison isolates SAM's guidance, not training length"
+    inference_resampling: "1 mm isotropic at inference too (their training resamples to 1 mm, their inference does not), mapped back to the case grid"
+    test_sets: "5-fold mean-probability ensemble (paper: single model)"
+    cache_rate: 1.0                   # all training scans cached in RAM (their default 0.7); speed only
+    logging: "wandb/TensorBoard replaced by no-op stand-ins; slice-image logging off"
+    environment: "Python 3.12, torch 2.11, MONAI 1.6.1 (paper: Python 3.8, torch 1.13, MONAI 1.3)"
 
 # Exploratory analyses decided after results were seen; reported separately and labelled as such.
 analysis:
