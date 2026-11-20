@@ -16,7 +16,8 @@ scripts/e2_summary.py.
 Output: a section "Segmentation-quality metrics (added after the results freeze)" appended to (or replaced
 in) results/E2/cv_summary.md and results/test/summary.md, between HTML comment markers; nothing above the
 markers is touched. Re-run this script after regenerating either summary. Tables: results/E2/tables/segq_*,
-results/test/tables/segq_*. No model, prediction, threshold or existing number is changed.
+results/test/tables/segq_*. No model, prediction, threshold or existing number is changed. The section ends with an additional
+E2a vs E1 comparison on lesions detected by both models (also added after the freeze).
 """
 
 from __future__ import annotations
@@ -185,6 +186,77 @@ def group_section(cases, lesions, g, cl_of, labels, comparisons, names, ci_kw, a
         iou_rows.append({"set": g, "model": labels[e], "whole-mask IoU": cell(st[e]["mask_iou"])})
 
 
+# ---------------------------------------------------------------- additional comparison (post freeze)
+SHARED_TITLE = "### Additional comparison, added after the results freeze: E2a vs E1 on shared lesions"
+
+
+def shared_lesion_section(lesions, groups, cl_of, labels, names, ci_kw, figs, tables, add) -> None:
+    """E2a − E1 lesion-wise Dice on the reference lesions detected by BOTH models, overall and by bin."""
+    add(SHARED_TITLE + "\n")
+    add("> **Additional comparison, added after the results freeze** (not one of the pre-set comparisons). Only "
+        "reference lesions detected by both E2a and E1 are compared, so both models are scored on the same lesions. "
+        "Per scan: mean lesion-wise Dice over those lesions (overall and by the reference lesion's size bin); A − B "
+        "with paired patient-bootstrap 95% CI and Wilcoxon signed-rank on per-patient values; **Holm adjustment "
+        "over the four rows of each set**. Scans without a shared lesion (in the bin) are dropped pairwise. E2a "
+        "places its boxes from the reference (on ISBI, from the rater it is scored against).\n")
+    rows, fig_rows = [], []
+    for g, title in groups:
+        L = lesions[lesions.group == g]
+        a = L[L.model == "E2a"].set_index(["case_id", "lesion"])
+        b = L[L.model == "E1"].set_index(["case_id", "lesion"]).loc[a.index]
+        both = a.detected & b.detected
+        cases = sorted(set(a.index.get_level_values(0)))
+        cl = np.array([cl_of[c] for c in cases])
+        t = []
+        for bn in ["all"] + names:
+            sel = both if bn == "all" else both & (a["bin"] == bn)
+            va = a.dice.where(sel).groupby(level=0).mean().reindex(cases).to_numpy(float)
+            vb = b.dice.where(sel).groupby(level=0).mean().reindex(cases).to_numpy(float)
+            r = ST.paired(va, vb, cl, ci_kw)
+            if r["n_scans"] == 0:
+                r["p"] = np.nan
+            ok = ~(np.isnan(va) | np.isnan(vb))
+            ma, mb = ST.mean_ci(np.where(ok, va, np.nan), cl, ci_kw), ST.mean_ci(np.where(ok, vb, np.nan), cl, ci_kw)
+            t.append({"set": title, "bin (mm³)": bn, "shared lesions": int(sel.sum()), "n scans": r["n_scans"],
+                      "n patients": r["n_patients"], "mean E2a": r["mean_a"], "mean E1": r["mean_b"],
+                      "mean diff (E2a − E1)": r["diff"], "95% CI": fmt_interval(r["low"], r["high"]),
+                      "Wilcoxon p": r["p"],
+                      "lesions with E2a > E1": f"{int((a.dice[sel] > b.dice[sel]).sum())}/{int(sel.sum())}"})
+            for e, m in (("E1", mb), ("E2a", ma)):
+                fig_rows.append({"group": g, "title": title, "bin": bn, "model": e, "mean": m["mean"],
+                                 "low": m["low"], "high": m["high"]})
+        t = pd.DataFrame(t)
+        t["p (Holm)"] = ST.holm(t["Wilcoxon p"])
+        rows.append(t)
+        if len(groups) > 1:
+            add(f"**{title}**" + (" (5 patients: smallest possible Wilcoxon p = 0.0625)" if g.startswith("isbi") else "") + "\n")
+        add(md_table(t.drop(columns="set"), index=False))
+        add("")
+    pd.concat(rows).to_csv(tables / "segq_e2a_vs_e1_shared.csv", index=False)
+    fr = pd.DataFrame(fig_rows)
+    fr.to_csv(tables / "segq_e2a_vs_e1_shared_means.csv", index=False)
+    bins = ["all"] + names
+    fig, axes = new_fig(4.2 * len(groups) + 0.8, 3.9, ncols=len(groups))
+    axes = np.atleast_1d(axes)
+    for ax, (g, title) in zip(axes, groups):
+        x = np.arange(len(bins))
+        for j, e in enumerate(["E1", "E2a"]):
+            q = fr[(fr.group == g) & (fr.model == e)].set_index("bin").loc[bins]
+            xs = x + (j - 0.5) * 0.38
+            ax.bar(xs, q["mean"].fillna(0), width=0.38, color=MODEL_COLORS[e], edgecolor=SURFACE, linewidth=1.5,
+                   label=labels[e], zorder=2)
+            err = np.vstack([q["mean"] - q["low"], q["high"] - q["mean"]]).clip(min=0)
+            ax.errorbar(xs, q["mean"], yerr=np.nan_to_num(err), fmt="none", ecolor=INK, elinewidth=1, capsize=2, zorder=3)
+        ax.set_xticks(x, ["all" if b == "all" else f"{b} mm³" for b in bins], color=INK, fontsize=8.5)
+        ax.set_ylim(0, 1.15)
+        ax.set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1.0])
+        ax.set_title(title, color=INK, fontsize=10.5, loc="left")
+    axes[0].set_ylabel("Lesion-wise Dice, lesions detected by both\n(mean of patient means, 95% CI)", color=INK2, fontsize=8.5)
+    axes[0].legend(frameon=False, fontsize=8, labelcolor=INK2, loc="upper left", ncol=2)
+    save_fig(fig, figs / "segq_e2a_vs_e1_shared.png")
+    add("![segq_e2a_vs_e1_shared](figures/segq_e2a_vs_e1_shared.png)\n")
+
+
 def build(cases, lesions, groups, cl_of, labels, comparisons, names, ci_kw, figs, tables, intro_extra: str) -> str:
     md: list[str] = []
     add = md.append
@@ -222,6 +294,7 @@ def build(cases, lesions, groups, cl_of, labels, comparisons, names, ci_kw, figs
         [labels[e] for e in MODELS])[[g for g, _ in groups]].rename(columns=dict(groups)) if len(groups) > 1 else
         iou.drop(columns="set"), index=len(groups) > 1))
     add("")
+    shared_lesion_section(lesions, groups, cl_of, labels, names, ci_kw, figs, tables, add)
     return "\n".join(md)
 
 

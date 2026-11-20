@@ -896,4 +896,46 @@ IoU = |A ∩ B| / |A ∪ B| on the raw masks (monotone in whole-mask Dice: IoU =
 | E2c MedSAM + brain box/tiles | 0.341 ± 0.171<br>[0.280, 0.403] | 0.179 ± 0.066<br>[0.136, 0.222] | 0.106 ± 0.032<br>[0.085, 0.130] | 0.092 ± 0.031<br>[0.072, 0.116] |
 | E8 MedSAM + zoomed tiles | 0.399 ± 0.169<br>[0.339, 0.460] | 0.255 ± 0.094<br>[0.196, 0.319] | 0.253 ± 0.066<br>[0.202, 0.287] | 0.225 ± 0.071<br>[0.169, 0.276] |
 
+### Additional comparison, added after the results freeze: E2a vs E1 on shared lesions
+
+> **Additional comparison, added after the results freeze** (not one of the pre-set comparisons). Only reference lesions detected by both E2a and E1 are compared, so both models are scored on the same lesions. Per scan: mean lesion-wise Dice over those lesions (overall and by the reference lesion's size bin); A − B with paired patient-bootstrap 95% CI and Wilcoxon signed-rank on per-patient values; **Holm adjustment over the four rows of each set**. Scans without a shared lesion (in the bin) are dropped pairwise. E2a places its boxes from the reference (on ISBI, from the rater it is scored against).
+
+**MSSEG in-dist.**
+
+| bin (mm³) | shared lesions | n scans | n patients | mean E2a | mean E1 | mean diff (E2a − E1) | 95% CI | Wilcoxon p | lesions with E2a > E1 | p (Holm) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| all | 851 | 29 | 29 | 0.697 | 0.721 | -0.024 | [-0.054, 0.008] | 0.092 | 252/851 | 0.184 |
+| <20 | 131 | 22 | 22 | 0.605 | 0.682 | -0.076 | [-0.137, -0.014] | 0.046 | 31/131 | 0.138 |
+| 20-100 | 444 | 29 | 29 | 0.672 | 0.723 | -0.051 | [-0.081, -0.020] | 0.005 | 110/444 | 0.019 |
+| >=100 | 276 | 28 | 28 | 0.772 | 0.748 | 0.024 | [-0.014, 0.066] | 0.849 | 111/276 | 0.849 |
+
+**MSSEG GE**
+
+| bin (mm³) | shared lesions | n scans | n patients | mean E2a | mean E1 | mean diff (E2a − E1) | 95% CI | Wilcoxon p | lesions with E2a > E1 | p (Holm) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| all | 160 | 8 | 8 | 0.739 | 0.699 | 0.040 | [0.021, 0.059] | 0.008 | 74/160 | 0.031 |
+| <20 | 4 | 3 | 3 | 0.638 | 0.772 | -0.135 | [-0.346, -0.015] | 0.250 | 0/4 | 0.500 |
+| 20-100 | 80 | 8 | 8 | 0.695 | 0.619 | 0.076 | [0.057, 0.095] | 0.008 | 47/80 | 0.031 |
+| >=100 | 76 | 8 | 8 | 0.793 | 0.794 | -0.001 | [-0.030, 0.026] | 0.945 | 27/76 | 0.945 |
+
+**ISBI rater 1** (5 patients: smallest possible Wilcoxon p = 0.0625)
+
+| bin (mm³) | shared lesions | n scans | n patients | mean E2a | mean E1 | mean diff (E2a − E1) | 95% CI | Wilcoxon p | lesions with E2a > E1 | p (Holm) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| all | 331 | 21 | 5 | 0.643 | 0.631 | 0.012 | [-0.070, 0.112] | 1.000 | 126/331 | 1.000 |
+| <20 | 15 | 9 | 4 | 0.537 | 0.393 | 0.144 | [0.044, 0.275] | 0.125 | 11/15 | 0.500 |
+| 20-100 | 147 | 21 | 5 | 0.603 | 0.599 | 0.004 | [-0.096, 0.121] | 1.000 | 62/147 | 1.000 |
+| >=100 | 169 | 21 | 5 | 0.688 | 0.686 | 0.002 | [-0.073, 0.094] | 1.000 | 53/169 | 1.000 |
+
+**ISBI rater 2** (5 patients: smallest possible Wilcoxon p = 0.0625)
+
+| bin (mm³) | shared lesions | n scans | n patients | mean E2a | mean E1 | mean diff (E2a − E1) | 95% CI | Wilcoxon p | lesions with E2a > E1 | p (Holm) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| all | 377 | 21 | 5 | 0.623 | 0.620 | 0.003 | [-0.060, 0.092] | 0.812 | 123/377 | 1.000 |
+| <20 | 23 | 10 | 4 | 0.315 | 0.333 | -0.017 | [-0.226, 0.108] | 0.625 | 7/23 | 1.000 |
+| 20-100 | 158 | 21 | 5 | 0.569 | 0.558 | 0.011 | [-0.077, 0.123] | 1.000 | 56/158 | 1.000 |
+| >=100 | 196 | 21 | 5 | 0.692 | 0.694 | -0.002 | [-0.056, 0.072] | 0.625 | 60/196 | 1.000 |
+
+![segq_e2a_vs_e1_shared](figures/segq_e2a_vs_e1_shared.png)
+
 <!-- segq:end -->

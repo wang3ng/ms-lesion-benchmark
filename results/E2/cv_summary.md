@@ -470,4 +470,17 @@ IoU = |A ∩ B| / |A ∪ B| on the raw masks (monotone in whole-mask Dice: IoU =
 | E2c MedSAM + brain box/tiles | 0.308 ± 0.126<br>[0.247, 0.369] |
 | E8 MedSAM + zoomed tiles | 0.358 ± 0.136<br>[0.293, 0.425] |
 
+### Additional comparison, added after the results freeze: E2a vs E1 on shared lesions
+
+> **Additional comparison, added after the results freeze** (not one of the pre-set comparisons). Only reference lesions detected by both E2a and E1 are compared, so both models are scored on the same lesions. Per scan: mean lesion-wise Dice over those lesions (overall and by the reference lesion's size bin); A − B with paired patient-bootstrap 95% CI and Wilcoxon signed-rank on per-patient values; **Holm adjustment over the four rows of each set**. Scans without a shared lesion (in the bin) are dropped pairwise. E2a places its boxes from the reference (on ISBI, from the rater it is scored against).
+
+| bin (mm³) | shared lesions | n scans | n patients | mean E2a | mean E1 | mean diff (E2a − E1) | 95% CI | Wilcoxon p | lesions with E2a > E1 | p (Holm) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| all | 380 | 15 | 15 | 0.668 | 0.705 | -0.037 | [-0.090, 0.021] | 0.208 | 108/380 | 0.416 |
+| <20 | 53 | 8 | 8 | 0.523 | 0.659 | -0.137 | [-0.267, 0.019] | 0.078 | 16/53 | 0.255 |
+| 20-100 | 178 | 15 | 15 | 0.633 | 0.700 | -0.068 | [-0.142, 0.024] | 0.064 | 39/178 | 0.255 |
+| >=100 | 149 | 15 | 15 | 0.737 | 0.719 | 0.018 | [-0.036, 0.082] | 0.804 | 53/149 | 0.804 |
+
+![segq_e2a_vs_e1_shared](figures/segq_e2a_vs_e1_shared.png)
+
 <!-- segq:end -->
