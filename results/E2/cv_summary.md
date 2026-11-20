@@ -1,6 +1,6 @@
 # E2 cross-validation comparison — E1 nnU-Net vs MedSAM (E2a oracle boxes, E2b E1 boxes, E2c brain box + tiles)
 
-Generated 2026-11-19 20:02 from commit `6269804` by `scripts/e2_summary.py`.
+Generated 2026-11-20 00:45 from commit `e215f0e` by `scripts/e2_summary.py`.
 
 > **Complete: all 15 MSSEG training patients, each scored by the fold model that did not train on them, for E1, E2a, E2b, E2c, E8.**
 
@@ -257,7 +257,52 @@ Box diagnostics, E2b MedSAM + E1 boxes (final checkpoint, 4 training patients pe
 
 > **Post hoc, decided after seeing E2c results; exploratory, not part of the pre-specified comparison.** A box whose MedSAM predicted-IoU score is below a threshold t gets an empty mask (it still counts in the per-pixel coverage). t is chosen per outer fold by nested cross-validation inside that fold's 12 training patients (4 inner folds, inner models trained with the same recipe; criterion: mean per-patient lesion F1 on the inner held-out patients, ties to the lowest t), then applied to the fold's validation patients, which are never used to choose it (`scripts/iou_filter_analysis.py`). Not applied to any test set.
 
-_IoU-filter results not available yet._
+Thresholds selected per outer fold (inner mean lesion F1 without / with the filter):
+
+| model | fold | inner_patients | level | threshold | inner_f1_no_filter | inner_f1_selected | unfiltered_mismatch_voxels |
+|---|---|---|---|---|---|---|---|
+| E2c | 0 | 12 | 17 | 0.400 | 0.190 | 0.203 | 0 |
+| E2c | 1 | 12 | 16 | 0.375 | 0.182 | 0.191 | 0 |
+| E2c | 2 | 12 | 14 | 0.325 | 0.183 | 0.186 | 0 |
+| E2c | 3 | 12 | 17 | 0.400 | 0.206 | 0.214 | 0 |
+| E2c | 4 | 12 | 15 | 0.350 | 0.225 | 0.230 | 0 |
+| E8 | 0 | 12 | 15 | 0.350 | 0.244 | 0.245 | 0 |
+| E8 | 1 | 12 | 15 | 0.350 | 0.256 | 0.258 | 0 |
+| E8 | 2 | 12 | 18 | 0.425 | 0.233 | 0.238 | 0 |
+| E8 | 3 | 12 | 20 | 0.475 | 0.265 | 0.267 | 0 |
+| E8 | 4 | 12 | 13 | 0.300 | 0.285 | 0.286 | 0 |
+
+### E2c MedSAM + brain box/tiles: unfiltered vs IoU-filtered (15 patients)
+
+| metric | unfiltered | filtered | diff (filtered − unfiltered) | Wilcoxon p (unadjusted) |
+|---|---|---|---|---|
+| lesion_f1 | 0.210 ± 0.103 | 0.226 ± 0.104 | 0.016 [0.007, 0.028] | 0.00577 |
+| fp_lesions | 113.133 ± 38.676 | 110.267 ± 36.041 | -2.867 [-5.333, -0.800] | 0.0259 |
+| lesion_precision | 0.193 ± 0.152 | 0.208 ± 0.151 | 0.016 [0.007, 0.026] | 0.00577 |
+| lesion_recall | 0.434 ± 0.150 | 0.427 ± 0.156 | -0.007 [-0.023, 0.003] | 0.593 |
+| dice | 0.457 ± 0.149 | 0.443 ± 0.145 | -0.014 [-0.024, -0.007] | 0.00465 |
+| pooled recall <20 | 20/133 = 0.150 | 19/133 = 0.143 | -0.008 [-0.026, 0.000] | – |
+| pooled recall 20-100 | 88/252 = 0.349 | 87/252 = 0.345 | -0.004 [-0.026, 0.012] | – |
+| pooled recall >=100 | 115/172 = 0.669 | 115/172 = 0.669 | 0.000 [0.000, 0.000] | – |
+| FP / scan <20 | 94.9 | 92.8 | -2.1 | – |
+| FP / scan 20-100 | 16.9 | 16.1 | -0.7 | – |
+| FP / scan >=100 | 1.4 | 1.3 | -0.1 | – |
+
+### E8 MedSAM + zoomed tiles: unfiltered vs IoU-filtered (15 patients)
+
+| metric | unfiltered | filtered | diff (filtered − unfiltered) | Wilcoxon p (unadjusted) |
+|---|---|---|---|---|
+| lesion_f1 | 0.296 ± 0.127 | 0.298 ± 0.124 | 0.002 [-0.003, 0.008] | 0.327 |
+| fp_lesions | 62.867 ± 25.368 | 61.667 ± 24.729 | -1.200 [-3.067, -0.067] | 0.0741 |
+| lesion_precision | 0.283 ± 0.169 | 0.293 ± 0.175 | 0.010 [0.000, 0.026] | 0.123 |
+| lesion_recall | 0.502 ± 0.182 | 0.490 ± 0.184 | -0.011 [-0.028, 0.000] | 0.109 |
+| dice | 0.513 ± 0.152 | 0.505 ± 0.144 | -0.008 [-0.017, -0.001] | 0.0663 |
+| pooled recall <20 | 25/133 = 0.188 | 24/133 = 0.180 | -0.008 [-0.026, 0.000] | – |
+| pooled recall 20-100 | 111/252 = 0.440 | 109/252 = 0.433 | -0.008 [-0.023, 0.000] | – |
+| pooled recall >=100 | 113/172 = 0.657 | 111/172 = 0.645 | -0.012 [-0.032, 0.000] | – |
+| FP / scan <20 | 50.0 | 49.2 | -0.8 | – |
+| FP / scan 20-100 | 11.6 | 11.3 | -0.3 | – |
+| FP / scan >=100 | 1.3 | 1.2 | -0.1 | – |
 
 ## Per-patient results
 
