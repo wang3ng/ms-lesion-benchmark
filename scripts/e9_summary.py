@@ -151,17 +151,17 @@ def main() -> int:
             for b in names:
                 d.loc[d[f"n_ref_{b}"] == 0, f"recall_{b}"] = np.nan
                 d.loc[(d[f"n_ref_{b}"] == 0) & (d[f"n_pred_{b}"] == 0), [f"f1_{b}", f"precision_{b}"]] = np.nan
-            data[m] = d.assign(empty=((d.n_ref_lesions == 0) & (d.ref_voxels == 0)).to_numpy()).sort_values("case_id")
+            data[m] = d.assign(empty_ref=((d.n_ref_lesions == 0) & (d.ref_voxels == 0)).to_numpy()).sort_values("case_id")
             les[m] = l_
         add(f"## {s['label']}\n")
-        empty = sorted(data["E1"][data["E1"].empty].case_id)
+        empty = sorted(data["E1"][data["E1"]["empty_ref"]].case_id)
         if empty:
             rows = [{"scan": c, "model": LABELS[m], "false-positive lesions": int(data[m].set_index("case_id").loc[c, "fp_lesions"]),
                      "predicted volume (mL)": data[m].set_index("case_id").loc[c, "pred_volume_ml"]} for c in empty for m in MODELS]
             add(f"**Empty reference, reported separately and left out:** {', '.join(empty)}.\n")
             add(md_table(pd.DataFrame(rows), index=False))
             add("")
-        data = {m: d[~d.empty].reset_index(drop=True) for m, d in data.items()}
+        data = {m: d[~d["empty_ref"]].reset_index(drop=True) for m, d in data.items()}
         refc = [f"n_ref_{b}" for b in names] + ["n_ref_lesions"]
         for m in MODELS[1:]:
             if list(data[m].case_id) != list(data["E1"].case_id) or not np.array_equal(data[m][refc], data["E1"][refc]):

@@ -78,6 +78,13 @@ results/**
 !results/E7/figures/**
 !results/E7/tables/
 !results/E7/tables/**
+!results/E9/
+!results/E9/summary.md
+!results/E9/training_set.json
+!results/E9/figures/
+!results/E9/figures/**
+!results/E9/tables/
+!results/E9/tables/**
 
 # Notebook scratch
 .ipynb_checkpoints/

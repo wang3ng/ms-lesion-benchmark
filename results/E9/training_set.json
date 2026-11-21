@@ -1,0 +1,33 @@
+{
+ "training": {
+  "scans": 99,
+  "patients": 64,
+  "by_dataset": {
+   "mslesseg": {
+    "scans": 84,
+    "patients": 49
+   },
+   "msseg2016": {
+    "scans": 15,
+    "patients": 15
+   }
+  },
+  "by_scanner": {
+   "philips_ingenia": 64,
+   "philips_achieva_dstream": 20,
+   "siemens_verio_3t": 5,
+   "siemens_aera_1p5t": 5,
+   "philips_ingenia_3t": 5
+  }
+ },
+ "excluded_mslesseg": {
+  "scans": 9,
+  "patients": 8,
+  "by_scanner": {
+   "unknown": 5,
+   "ge_signa_hdxt": 2,
+   "ge_signa_explorer": 1,
+   "ge_optima_mr450w": 1
+  }
+ }
+}
