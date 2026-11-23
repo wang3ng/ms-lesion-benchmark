@@ -71,9 +71,67 @@ MS-SAMLess performed between the MedSAM conditions and E1. On the in-distributio
 
 **Table 1. Data.** Datasets, scanners, numbers of scans and patients, and role. MSSEG-2016 training: Siemens Verio 3T, Siemens Aera 1.5T and Philips Ingenia 3T, 5 patients each <!-- src: README.md -->. MSSEG-2016 test: 10 scans per training scanner and 8 GE Discovery 3T scans (unseen scanner) <!-- src: README.md -->. ISBI 2015: 21 scans of 5 patients, Philips 3T, two raters <!-- src: results/test/summary.md -->. E9 only: MSLesSeg training, 84 kept scans of 49 patients and 9 excluded <!-- src: results/E9/training_set.json -->. Inputs: FLAIR, T1, T2; reference: MSSEG consensus or each ISBI rater. *Source: README.md, results/E9/training_set.json.*
 
+<!-- table:1:start -->
+| Dataset | Scanner (site) | Field | Scans | Patients | Role |
+|---|---|---|---|---|---|
+| MSSEG-2016 training | Siemens Verio (Rennes) | 3T | 5 | 5 | 5-fold CV (development) |
+| | Siemens Aera (Lyon) | 1.5T | 5 | 5 | 5-fold CV (development) |
+| | Philips Ingenia (Lyon) | 3T | 5 | 5 | 5-fold CV (development) |
+| MSSEG-2016 test | Siemens Verio (Rennes) | 3T | 10 | 10 | in-distribution test |
+| | Siemens Aera (Lyon) | 1.5T | 10 | 10 | in-distribution test |
+| | Philips Ingenia (Lyon) | 3T | 10 | 10 | in-distribution test |
+| | GE Discovery (Bordeaux) | 3T | 8 | 8 | unseen-scanner test |
+| ISBI 2015 (labelled release) | Philips | 3T | 21 | 5 | external test, each rater scored separately |
+| MSLesSeg training (E9 only, exploratory) | Philips Ingenia / Achieva dStream | – | 84 | 49 | E9 training only (9 GE/unknown-scanner scans excluded) |
+
+Inputs: FLAIR, T1, T2 on the FLAIR grid. References: MSSEG consensus of seven experts; ISBI raters 1 and 2; MSLesSeg's own masks (different annotation protocol). One in-distribution test scan (msseg_test_c07_p08) has an empty consensus and is reported separately. <!-- src: README.md (MSSEG scanners, sites, field strengths, counts); results/test/summary.md (ISBI scans/patients); results/E9/training_set.json (MSLesSeg) -->
+<!-- table:1:end -->
+
 **Table 2. Cross-validation results (15 MSSEG training patients <!-- src: results/E2/cv_summary.md -->).** For E1, E2a, E2b, E2c and E8: Dice, lesion precision, recall and F1, and FP lesions per scan (mean ± SD with patient-bootstrap 95% CI), plus pooled lesion recall per volume bin (detected/reference, cluster-bootstrap 95% CI). E2a uses reference boxes and is an upper bound on tracing. *Source: results/E2/tables/metrics.csv, results/E2/tables/recall_by_size_bin.csv.*
 
+<!-- table:2:start -->
+| Metric | E1 nnU-Net | *E2a MedSAM, oracle boxes* † | E2b MedSAM, E1 boxes | E2c MedSAM, brain box + tiles | E8 MedSAM, zoomed tiles |
+|---|---|---|---|---|---|
+| Dice | 0.767 ± 0.082 [0.727, 0.807] | *0.757 ± 0.032 [0.742, 0.773]* | 0.683 ± 0.073 [0.646, 0.718] | 0.457 ± 0.149 [0.384, 0.527] | 0.513 ± 0.152 [0.439, 0.585] |
+| Lesion precision | 0.734 ± 0.115 [0.675, 0.785] | *0.791 ± 0.145 [0.718, 0.859]* | 0.616 ± 0.135 [0.550, 0.681] | 0.193 ± 0.152 [0.121, 0.269] | 0.283 ± 0.169 [0.200, 0.364] |
+| Lesion recall | 0.687 ± 0.183 [0.594, 0.774] | *0.905 ± 0.093 [0.859, 0.948]* | 0.659 ± 0.194 [0.556, 0.747] | 0.434 ± 0.150 [0.362, 0.509] | 0.502 ± 0.182 [0.410, 0.588] |
+| Lesion F1 | 0.693 ± 0.133 [0.627, 0.757] | *0.840 ± 0.117 [0.781, 0.895]* | 0.619 ± 0.147 [0.542, 0.687] | 0.210 ± 0.103 [0.160, 0.259] | 0.296 ± 0.127 [0.235, 0.357] |
+| FP lesions / scan | 8.3 ± 4.8 [6.0, 10.7] | *12.7 ± 14.6 [6.3, 20.5]* | 20.0 ± 16.4 [12.5, 28.5] | 113.1 ± 38.7 [94.4, 132.1] | 62.9 ± 25.4 [51.1, 75.9] |
+| Pooled recall, < 20 mm³ | 63/133 = 0.474 [0.281, 0.586] | *89/133 = 0.669 [0.480, 0.821]* | 54/133 = 0.406 [0.226, 0.533] | 20/133 = 0.150 [0.042, 0.231] | 25/133 = 0.188 [0.085, 0.282] |
+| Pooled recall, 20–100 mm³ | 180/252 = 0.714 [0.605, 0.797] | *243/252 = 0.964 [0.933, 0.987]* | 176/252 = 0.698 [0.592, 0.777] | 88/252 = 0.349 [0.277, 0.429] | 111/252 = 0.440 [0.348, 0.540] |
+| Pooled recall, ≥ 100 mm³ | 149/172 = 0.866 [0.780, 0.939] | *171/172 = 0.994 [0.980, 1.000]* | 149/172 = 0.866 [0.791, 0.935] | 115/172 = 0.669 [0.551, 0.778] | 113/172 = 0.657 [0.500, 0.803] |
+
+Mean ± SD over the 15 patients with the patient-bootstrap 95% CI; pooled recall = detected / reference lesions with a cluster-bootstrap 95% CI. † E2a places its boxes from the reference: an upper bound on tracing, not a fair comparison (italic). <!-- src: results/E2/tables/metrics.csv; results/E2/tables/recall_by_size_bin.csv -->
+<!-- table:2:end -->
+
 **Table 3. Test results.** For E1, E2a, E2b, E2c and E8 on the MSSEG in-distribution set (29 scans; the empty-consensus scan reported separately), the GE Discovery set (8 scans) and ISBI 2015 per rater (21 scans of 5 patients) <!-- src: results/test/summary.md -->: lesion F1, Dice, FP lesions per scan and pooled recall of lesions < 20 mm³, with paired differences from E1 (patient-bootstrap 95% CI, Holm-adjusted Wilcoxon p; for ISBI, per-patient means with n = 5). *Source: results/test/tables/metrics.csv, results/test/tables/recall_by_size_bin.csv, results/test/tables/paired_comparisons.csv.*
+
+<!-- table:3:start -->
+| Test set | Model | Lesion F1 | Dice | FP lesions / scan | Pooled recall < 20 mm³ | Δ lesion F1 vs E1 [95% CI] | p (Holm) |
+|---|---|---|---|---|---|---|---|
+| MSSEG in-distribution (29 scans) | E1 nnU-Net | 0.725 | 0.744 | 5.1 | 157/415 = 0.378 | – | – |
+|  | *E2a MedSAM, oracle boxes* † | *0.879* | *0.776* | *7.9* | *275/415 = 0.663* | – | – |
+|  | E2b MedSAM, E1 boxes | 0.675 | 0.668 | 10.3 | 144/415 = 0.347 | −0.050 [−0.070, −0.030] | < 0.001 |
+|  | E2c MedSAM, brain box + tiles | 0.235 | 0.485 | 78.8 | 48/415 = 0.116 | −0.490 [−0.537, −0.443] | < 0.001 |
+|  | E8 MedSAM, zoomed tiles | 0.376 | 0.550 | 36.0 | 71/415 = 0.171 | −0.349 [−0.405, −0.292] | < 0.001 |
+| MSSEG GE, unseen scanner (8 scans) | E1 nnU-Net | 0.648 | 0.667 | 8.9 | 4/30 = 0.133 | – | – |
+|  | *E2a MedSAM, oracle boxes* † | *0.948* | *0.793* | *5.1* | *20/30 = 0.667* | – | – |
+|  | E2b MedSAM, E1 boxes | 0.645 | 0.607 | 12.1 | 4/30 = 0.133 | −0.003 [−0.034, 0.026] | 1.00 |
+|  | E2c MedSAM, brain box + tiles | 0.154 | 0.299 | 71.1 | 4/30 = 0.133 | −0.493 [−0.530, −0.462] | 0.086 |
+|  | E8 MedSAM, zoomed tiles | 0.255 | 0.398 | 43.0 | 3/30 = 0.100 | −0.393 [−0.465, −0.332] | 0.086 |
+| ISBI 2015, rater 1 (21 scans, 5 patients) | E1 nnU-Net | 0.649 | 0.725 | 8.0 | 28/130 = 0.215 | – | – |
+|  | *E2a MedSAM, oracle boxes* † | *0.833* | *0.722* | *8.0* | *71/130 = 0.546* | – | – |
+|  | E2b MedSAM, E1 boxes | 0.557 | 0.644 | 19.2 | 19/130 = 0.146 | −0.092 [−0.126, −0.054] | 0.69 |
+|  | E2c MedSAM, brain box + tiles | 0.079 | 0.190 | 61.4 | 2/130 = 0.015 | −0.571 [−0.648, −0.497] | 0.69 |
+|  | E8 MedSAM, zoomed tiles | 0.261 | 0.400 | 38.0 | 16/130 = 0.123 | −0.388 [−0.489, −0.285] | 0.69 |
+| ISBI 2015, rater 2 (21 scans, 5 patients) | E1 nnU-Net | 0.616 | 0.690 | 7.1 | 43/169 = 0.254 | – | – |
+|  | *E2a MedSAM, oracle boxes* † | *0.803* | *0.703* | *13.8* | *80/169 = 0.473* | – | – |
+|  | E2b MedSAM, E1 boxes | 0.527 | 0.606 | 17.9 | 26/169 = 0.154 | −0.089 [−0.127, −0.047] | 0.69 |
+|  | E2c MedSAM, brain box + tiles | 0.076 | 0.168 | 61.2 | 1/169 = 0.006 | −0.540 [−0.612, −0.461] | 0.69 |
+|  | E8 MedSAM, zoomed tiles | 0.225 | 0.363 | 39.0 | 9/169 = 0.053 | −0.391 [−0.492, −0.280] | 0.69 |
+
+Means over scans (5-fold ensembles; empty-consensus scan excluded). Δ = model − E1, paired patient bootstrap 95% CI; p = two-sided Wilcoxon signed-rank, Holm-adjusted within each comparison and test set over the per-scan metrics. ISBI: CIs resample the 5 patients and Wilcoxon uses per-patient means (n = 5; smallest attainable p 0.0625). † E2a uses reference boxes (upper bound; italic) and was not part of the paired comparisons with E1. <!-- src: results/test/tables/metrics.csv; results/test/tables/recall_by_size_bin.csv; results/test/tables/paired_comparisons.csv -->
+<!-- table:3:end -->
 
 ### Main figures
 
